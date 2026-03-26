@@ -4,6 +4,7 @@
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/CommonTypeConstraints.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Bytecode/BytecodeOpInterface.td"
 include "calcDialect.td"
 
 def calc_constOp : calc_Op<"const", [Pure]> {
