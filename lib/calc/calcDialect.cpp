@@ -11,4 +11,4 @@ void calcDialect::initialize() {
     >();
 }
 
-#include "calc/calcDialect.cpp.inc"
+#include "calc/calcOpsDialect.h.inc"
