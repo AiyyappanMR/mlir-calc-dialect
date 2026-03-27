@@ -7,6 +7,8 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 
 #include "calc/calcDialect.h"
 

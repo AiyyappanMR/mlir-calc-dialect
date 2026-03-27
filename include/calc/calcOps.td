@@ -1,8 +1,10 @@
 #ifndef CALC_OPS
 #define CALC_OPS
 
-//include "mlir/IR/OpBase.td"
-//include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/CommonTypeConstraints.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"  
+//include "mlir/Bytecode/BytecodeOpInterface.td"
 include "calcDialect.td"
 
 def calc_constOp : calc_Op<"const", [Pure]> {
@@ -10,14 +12,14 @@ def calc_constOp : calc_Op<"const", [Pure]> {
     let description = [{
         Constant operation turns a literal integer value into an SSA value.
     }];
-    let arguments = (ins AnyIntegerAttr:$value);
-    let results = (outs AnyIntegerType:$result);
-    let builder = [
+    let arguments = (ins AnyAttrOf<[I32Attr, I64Attr]>:$value);
+    let results = (outs AnyTypeOf<[I32, I64]>:$result);
+    let builders = [
         OpBuilder<(ins "mlir::IntegerAttr":$value), [{
             build($_builder, $_state, value.getType(), value);
         }]>
     ];
-    let assemblyFormat = "$value attr-dict";
+    //let assemblyFormat = "attr-dict $value";
 }
 
 def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType]> {
@@ -43,7 +45,7 @@ def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> 
 def calc_printOp : calc_Op<"print", []> {
     let summary = "Prints the result";
     let description = [{Takes one integer operand and prints it.}];
-    let arguments = (ins AnyIntegerType:$input1);
+    let arguments = (ins AnyTypeOf<[I32, I64]>:$input1);
     let assemblyFormat = "$input1 `:` type($input1) attr-dict ";
 }
 

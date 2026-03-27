@@ -3,6 +3,6 @@
 
 #include "mlir/IR/Dialect.h"
 
-#include "calc/calcDialect.h.inc"
+#include "calc/calcOpsDialect.h.inc"
 
 #endif

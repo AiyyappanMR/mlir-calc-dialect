@@ -14,7 +14,7 @@ def calc_Dialect : Dialect {
     let cppNamespace = "::calc";
 }
 
-def calc_Op<string mnemonic, list<Trait> traits = []> 
+class calc_Op<string mnemonic, list<Trait> traits = []> 
     : Op<calc_Dialect, mnemonic, traits>;
 
 #endif
