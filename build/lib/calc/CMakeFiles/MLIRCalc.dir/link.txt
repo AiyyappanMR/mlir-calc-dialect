@@ -1,0 +1,2 @@
+/usr/bin/ar Dqc ../libMLIRCalc.a CMakeFiles/obj.MLIRCalc.dir/calcDialect.cpp.o CMakeFiles/obj.MLIRCalc.dir/calcOps.cpp.o
+/usr/bin/ranlib -D ../libMLIRCalc.a
