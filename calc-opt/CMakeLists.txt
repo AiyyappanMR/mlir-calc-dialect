@@ -9,9 +9,14 @@ target_link_libraries(calc-opt
     MLIRIR
     MLIRParser
     MLIRPass
+    MLIRRegisterAllPasses
     MLIRSupport
     MLIRFuncDialect
     MLIRArithDialect
+    MLIRTosaDialect
+    MLIRLinalgDialect
+    MLIRMemRefDialect
+    MLIRAffineDialect
 )
 
 mlir_check_all_link_libraries(calc-opt)

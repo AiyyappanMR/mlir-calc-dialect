@@ -1,0 +1,15 @@
+*.txt
+!CMakeLists.txt
+.vscode/
+*.exe
+*.o
+build/
+**/build/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Testing caches
+.pytest_cache/
+.cache/

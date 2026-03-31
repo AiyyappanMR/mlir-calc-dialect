@@ -23,13 +23,23 @@ def calc_constOp : calc_Op<"const", [Pure]> {
 }
 
 def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType]> {
-    let summary = "Add two values";
+    let summary = "Add two scaler values";
     let description = [{
-        Takes two integer operands and returns their sum.
+        Adds two scalar integer or float values of the same type.
     }];
-    let arguments = (ins AnyTypeOf<[I32, I64]>:$input1, AnyTypeOf<[I32, I64]>:$input2);
-    let results = (outs AnyTypeOf<[I32, I64]>:$result);
+    let arguments = (ins AnyTypeOf<[AnyInteger, AnyFloat]>:$input1, AnyTypeOf<[AnyInteger, AnyFloat]>:$input2);
+    let results = (outs AnyTypeOf<[AnyInteger, AnyFloat]>:$result);
     let assemblyFormat = "$input1 `,` $input2 attr-dict `:` type($result)";
+}
+
+def calc_addtOp : calc_Op<"addt", [Pure, Commutative, SameOperandsAndResultRank, SameOperandsAndResultElementType]> {
+    let summary = "Add two tensor values";
+    let description = [{
+        Adds two tensors of identical shape and element type.
+    }];
+    let arguments = (ins RankedTensorOf<[AnyInteger, AnyFloat]>:$input1,RankedTensorOf<[AnyInteger, AnyFloat]>:$input2);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
