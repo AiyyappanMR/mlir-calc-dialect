@@ -44,4 +44,3 @@ func.func @test_addt_5(%arg0 : tensor<1xi32>, %arg1 : tensor<?xi32>) -> tensor<?
 //     %result = calc.addt %arg0, %arg1 : (tensor<3x1xf64>, tensor<3x3xf64>) -> tensor<3x3xf64>
 //     return %result : tensor<3x3xf64>
 // }
-
