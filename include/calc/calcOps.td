@@ -47,8 +47,8 @@ def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> 
     let description = [{
         Takes two integer operands and returns their product.
     }];
-    let arguments = (ins AnyTypeOf<[I32, I64]>:$input1, AnyTypeOf<[I32, I64]>:$input2);
-    let results = (outs AnyTypeOf<[I32, I64]>:$result);
+    let arguments = (ins AnyTypeOf<[AnyInteger, AnyFloat]>:$input1, AnyTypeOf<[AnyInteger, AnyFloat]>:$input2);
+    let results = (outs AnyTypeOf<[AnyInteger, AnyFloat]>:$result);
     let assemblyFormat = "$input1 `,` $input2 attr-dict `:` type($result)";
 }
 

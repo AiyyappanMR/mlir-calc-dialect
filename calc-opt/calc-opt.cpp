@@ -7,11 +7,14 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/IR/DialectRegistry.h"
+#include "mlir/Pass/PassRegistry.h" 
 #include "calc/calcDialect.h"
 #include "calc/calcOps.h"
+#include "calc/calcPasses.h" 
 
 int main(int argc, char **argv) {
     mlir::registerAllPasses();
+    calc::registerCalcPasses();
     mlir::DialectRegistry registry;
     registry.insert<calc::calcDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect,
                     mlir::tosa::TosaDialect,mlir::linalg::LinalgDialect,
