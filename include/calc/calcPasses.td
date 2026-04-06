@@ -8,4 +8,9 @@ def CalcToArithPass : Pass<"calc-to-arith", "::mlir::ModuleOp"> {
     let description = [{Lowers calc.add and calc.mul operations to arith dialect equivalents.}];
 }
 
+def CalcToTosaPass : Pass<"calc-to-tosa", "::mlir::ModuleOp"> {
+    let summary = "Lower calc dialect to tosa dialect";
+    let description = [{Lowers calc.add and calc.mul operations to tosa dialect equivalents.}];
+}
+
 #endif 
