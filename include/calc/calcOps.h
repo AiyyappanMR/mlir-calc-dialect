@@ -6,6 +6,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/Dialect/Traits.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"

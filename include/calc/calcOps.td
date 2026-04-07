@@ -3,7 +3,9 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/CommonTypeConstraints.td"
-include "mlir/Interfaces/InferTypeOpInterface.td"  
+include "mlir/Interfaces/InferTypeOpInterface.td"
+
+include "mlir/IR/OpBase.td"
 //include "mlir/Bytecode/BytecodeOpInterface.td"
 include "calcDialect.td"
 
@@ -32,12 +34,26 @@ def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType]> 
     let assemblyFormat = "$input1 `,` $input2 attr-dict `:` type($result)";
 }
 
-def calc_addtOp : calc_Op<"addt", [Pure, Commutative, SameOperandsAndResultRank, SameOperandsAndResultElementType]> {
+def calc_addtOp : calc_Op<"addt", [Pure, Commutative, SameOperandsAndResultRank, SameOperandsAndResultElementType, ResultsBroadcastableShape]> {
     let summary = "Add two tensor values";
     let description = [{
         Adds two tensors of identical shape and element type.
     }];
     let arguments = (ins RankedTensorOf<[AnyInteger, AnyFloat]>:$input1,RankedTensorOf<[AnyInteger, AnyFloat]>:$input2);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+}
+
+def calc_addcmulOp : calc_Op<"addcmul",[Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, ResultsBroadcastableShape]> {
+    let summary = "Add scaled element-wise multiplication of two tensors to input";
+    let description = [{Performs the element-wise multiplication of tensor1 by tensor2, 
+                        multiplies the result by the scalar value and adds it to input.
+                        '''
+                        Output = input + value * (tensor1 * tensor2)
+                        '''
+                        }];
+    let arguments = (ins RankedTensorOf<[AnyInteger, AnyFloat]>:$input, RankedTensorOf<[AnyInteger, AnyFloat]>:$tensor1, 
+                        RankedTensorOf<[AnyInteger, AnyFloat]>:$tensor2, OptionalAttr<AnyAttrOf<[F32Attr, F64Attr, I32Attr, I64Attr]>>:$value);
     let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
