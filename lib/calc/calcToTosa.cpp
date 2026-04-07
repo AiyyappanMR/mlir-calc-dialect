@@ -66,6 +66,49 @@ class covertMulElementWiseOp : public mlir::OpRewritePattern<CalcOp> {
 };
 } //namespace
 
+namespace{
+class convertAddcmulOp : public mlir::OpRewritePattern<calc::addcmulOp> {
+    using mlir::OpRewritePattern<calc::addcmulOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(calc::addcmulOp  op, mlir::PatternRewriter &rewriter) const override {
+        // Get the tensor operands and the result type and shape from the addcmulOp
+        mlir::Value input = op.getInput();
+        mlir::Value tensor1 = op.getTensor1();
+        mlir::Value tensor2 = op.getTensor2();
+        mlir::ShapedType resultType = llvm::cast<mlir::ShapedType>(op.getResult().getType());
+
+        // Create a constant shift value of 0 for the tosa::MulOp
+        mlir::RankedTensorType rankedShiftType = mlir::RankedTensorType::get({}, rewriter.getI8Type());
+        mlir::DenseElementsAttr shiftAttr = mlir::DenseElementsAttr::get(rankedShiftType, rewriter.getI8IntegerAttr(0));
+        mlir::UnrankedTensorType unrankedShiftType = mlir::UnrankedTensorType::get(rewriter.getI8Type());
+        mlir::Value shift = mlir::tosa::ConstOp::create(rewriter, op.getLoc(), unrankedShiftType, shiftAttr);
+
+        // Performs the element-wise multiplication of tensor1 by tensor2. 
+        mlir::Value tensor_out_1 = mlir::tosa::MulOp::create(rewriter, op.getLoc(), resultType, tensor1, tensor2, shift);
+
+        // check if the optional value attribute is present and compute the final result..
+        mlir::Attribute valueAttr = op.getValueAttr();
+        if (valueAttr) {
+            // If the value attribute is present, we make it a constant tensor and multiply it with tensor_out_1, 
+            // then add the result to the input tensor.
+            mlir::DenseElementsAttr valueDense = mlir::DenseElementsAttr::get(resultType, valueAttr);
+            mlir::Value valueTensor = mlir::tosa::ConstOp::create(rewriter, op.getLoc(), resultType, valueDense);
+            mlir::Value tensor_out_2 = mlir::tosa::MulOp::create(rewriter, op.getLoc(), resultType, tensor_out_1, valueTensor, shift);
+            mlir::Value finalResult = mlir::tosa::AddOp::create(rewriter, op.getLoc(), resultType, input, tensor_out_2);
+            rewriter.replaceOp(op, finalResult);
+            return mlir::success();
+
+        }
+        else{
+            // If the value attribute is not present, we directly add tensor_out_1 to the input tensor.
+            mlir::Value finalResult = mlir::tosa::AddOp::create(rewriter, op.getLoc(), resultType, input, tensor_out_1);
+            rewriter.replaceOp(op, finalResult);
+            return mlir::success();
+        }  
+    }
+};
+}
+
 namespace calc{
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -83,7 +126,9 @@ public:
         patterns.add<convertElemWiseOp<addOp, mlir::tosa::AddOp>>(&getContext());
         target.addIllegalOp<mulOp>();
         patterns.add<covertMulElementWiseOp<mulOp, mlir::tosa::MulOp>>(&getContext());
-        
+        // Adding addcmulOp to the illegal ops.
+        target.addIllegalOp<addcmulOp>();
+        patterns.add<convertAddcmulOp>(&getContext());
         if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
             return signalPassFailure();
         }
