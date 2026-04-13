@@ -4,7 +4,8 @@
 #include <memory>
 
 #include "mlir/Pass/Pass.h"
-namespace calc{
+namespace calc
+{
 
 #define GEN_PASS_DECL
 #include "calc/calcPasses.h.inc"
@@ -12,6 +13,6 @@ namespace calc{
 #define GEN_PASS_REGISTRATION
 #include "calc/calcPasses.h.inc"
 
-}
+} // namespace calc
 
 #endif
