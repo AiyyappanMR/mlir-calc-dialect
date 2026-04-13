@@ -1,29 +1,26 @@
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Tosa/IR/TosaOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Tools/mlir-opt/MlirOptMain.h"
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/Pass/PassRegistry.h" 
 #include "calc/calcDialect.h"
 #include "calc/calcOps.h"
-#include "calc/calcPasses.h" 
+#include "calc/calcPasses.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tosa/IR/TosaOps.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/InitAllPasses.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     mlir::registerAllPasses();
     calc::registerCalcPasses();
     mlir::DialectRegistry registry;
-    registry.insert<calc::calcDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect,
-                    mlir::tosa::TosaDialect,mlir::linalg::LinalgDialect,
-                    mlir::memref::MemRefDialect, mlir::affine::AffineDialect
-                    >();
-    return mlir::asMainReturnCode(
-        mlir::MlirOptMain(argc, argv, "Calc optimizer\n", registry));
+    registry.insert<calc::calcDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect, mlir::tosa::TosaDialect,
+                    mlir::linalg::LinalgDialect, mlir::memref::MemRefDialect, mlir::affine::AffineDialect>();
+    return mlir::asMainReturnCode(mlir::MlirOptMain(argc, argv, "Calc optimizer\n", registry));
 }
-
 
 //-------------------------------------------------------
 // Another way of defining opt still in progress
@@ -34,11 +31,10 @@ int main(int argc, char **argv) {
 // #include "mlir/IR/OwningOpRef.h"   // for owningopref
 // #include "mlir/IR/BuiltinOps.h"    // for ModuleOp
 
-
 // #include "llvm/Support/CommandLine.h"  // for cmd line input
 // #include "llvm/Support/MemoryBuffer.h"
 // #include "llvm/Support/SourceMgr.h"
-// #include "llvm/Support/raw_ostream.h" 
+// #include "llvm/Support/raw_ostream.h"
 
 // #include "calc/calcDialect.h"
 // #include "mlir/Dialect/Func/IR/FuncOps.h"
