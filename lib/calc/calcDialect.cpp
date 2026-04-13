@@ -4,12 +4,11 @@
 using namespace mlir;
 using namespace calc;
 
-void calcDialect::initialize()
-{
-    addOperations<
+void calcDialect::initialize() {
+  addOperations<
 #define GET_OP_LIST
 #include "calc/calcOps.cpp.inc"
-        >();
+      >();
 }
 
 #include "calc/calcOpsDialect.cpp.inc"
