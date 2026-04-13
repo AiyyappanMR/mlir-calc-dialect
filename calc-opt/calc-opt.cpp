@@ -12,14 +12,16 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
-int main(int argc, char **argv)
-{
-    mlir::registerAllPasses();
-    calc::registerCalcPasses();
-    mlir::DialectRegistry registry;
-    registry.insert<calc::calcDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect, mlir::tosa::TosaDialect,
-                    mlir::linalg::LinalgDialect, mlir::memref::MemRefDialect, mlir::affine::AffineDialect>();
-    return mlir::asMainReturnCode(mlir::MlirOptMain(argc, argv, "Calc optimizer\n", registry));
+int main(int argc, char **argv) {
+  mlir::registerAllPasses();
+  calc::registerCalcPasses();
+  mlir::DialectRegistry registry;
+  registry.insert<calc::calcDialect, mlir::func::FuncDialect,
+                  mlir::arith::ArithDialect, mlir::tosa::TosaDialect,
+                  mlir::linalg::LinalgDialect, mlir::memref::MemRefDialect,
+                  mlir::affine::AffineDialect>();
+  return mlir::asMainReturnCode(
+      mlir::MlirOptMain(argc, argv, "Calc optimizer\n", registry));
 }
 
 //-------------------------------------------------------
