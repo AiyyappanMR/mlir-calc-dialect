@@ -45,7 +45,7 @@ class convertElemWiseOp : public mlir::OpRewritePattern<CalcOp> {
 
 namespace {
 template <typename CalcOp, typename tosaOp>
-class covertMulElementWiseOp : public mlir::OpRewritePattern<CalcOp> {
+class convertMulElementWiseOp : public mlir::OpRewritePattern<CalcOp> {
   using mlir::OpRewritePattern<CalcOp>::OpRewritePattern;
 
   mlir::LogicalResult
@@ -83,6 +83,22 @@ class covertMulElementWiseOp : public mlir::OpRewritePattern<CalcOp> {
 } // namespace
 
 namespace {
+template <typename CalcOp, typename tosaOp>
+class convertTensorWiseOp : public mlir::OpRewritePattern<CalcOp> {
+    using mlir::OpRewritePattern<CalcOp>::OpRewritePattern;
+        mlir::LogicalResult matchAndRewrite(CalcOp op, mlir::PatternRewriter &rewriter) const override {
+            // Get the tensor operands and the result type and shape from the addtOp
+            mlir::Value lhs = op.getInput1();
+            mlir::Value rhs = op.getInput2();
+            mlir::Type resultType = op.getResult().getType();
+            // replace the addtOp with tosa::AddOp
+            rewriter.replaceOpWithNewOp<tosaOp>(op, resultType, lhs, rhs);
+            return mlir::success();
+        }
+    };
+} // namespace
+
+namespace {
 class convertAddcmulOp : public mlir::OpRewritePattern<calc::addcmulOp> {
   using mlir::OpRewritePattern<calc::addcmulOp>::OpRewritePattern;
 
@@ -97,14 +113,12 @@ class convertAddcmulOp : public mlir::OpRewritePattern<calc::addcmulOp> {
         llvm::cast<mlir::ShapedType>(op.getResult().getType());
 
     // Create a constant shift value of 0 for the tosa::MulOp
-    mlir::RankedTensorType rankedShiftType =
-        mlir::RankedTensorType::get({}, rewriter.getI8Type());
-    mlir::DenseElementsAttr shiftAttr = mlir::DenseElementsAttr::get(
-        rankedShiftType, rewriter.getI8IntegerAttr(0));
-    mlir::UnrankedTensorType unrankedShiftType =
-        mlir::UnrankedTensorType::get(rewriter.getI8Type());
-    mlir::Value shift = mlir::tosa::ConstOp::create(
-        rewriter, op.getLoc(), unrankedShiftType, shiftAttr);
+    mlir::RankedTensorType shiftType =
+        mlir::RankedTensorType::get({1}, rewriter.getI8Type());  // {1} not {}
+    mlir::DenseElementsAttr shiftAttr =
+        mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+    mlir::Value shift =
+        mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr);
 
     // Performs the element-wise multiplication of tensor1 by tensor2.
     mlir::Value tensor_out_1 = mlir::tosa::MulOp::create(
@@ -155,8 +169,12 @@ public:
     target.addIllegalOp<addOp>();
     patterns.add<convertElemWiseOp<addOp, mlir::tosa::AddOp>>(&getContext());
     target.addIllegalOp<mulOp>();
-    patterns.add<covertMulElementWiseOp<mulOp, mlir::tosa::MulOp>>(
+    patterns.add<convertMulElementWiseOp<mulOp, mlir::tosa::MulOp>>(
         &getContext());
+    // Adding addtOp to the illegal ops.
+    target.addIllegalOp<addtOp>();
+    patterns.add<convertTensorWiseOp<addtOp, mlir::tosa::AddOp>>(&getContext());
+
     // Adding addcmulOp to the illegal ops.
     target.addIllegalOp<addcmulOp>();
     patterns.add<convertAddcmulOp>(&getContext());
