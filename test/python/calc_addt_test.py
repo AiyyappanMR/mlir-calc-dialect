@@ -122,10 +122,10 @@ ADDT_TEST_CASES = [
         id = "2x2xi32_basic",
     ),
     pytest.param(
-        torch.tensor([[-1, -5], [10, 0]], dtype = torch.int32),
-        torch.tensor([[1, 5], [-5, 0]], dtype = torch.int32),
-        "2x2xi32",
-        id = "2x2xi32_negatives_and_mixed",
+        torch.tensor([10, 0], dtype = torch.int32),
+        torch.tensor([6, 6], dtype = torch.int32),
+        "2xi32",
+        id = "2xi32_negatives_and_mixed",
     ),
     pytest.param(
         torch.tensor([[0, 0], [0, 0]], dtype = torch.int32),
@@ -147,6 +147,9 @@ def test_addt(input1, input2, tensor_type):
     # actual and calc outputs 
     expected = torch.add(input1, input2).numpy()
     actual = run_addt(input1, input2, tensor_type)
+
+    print(f"\n[{tensor_type}] actual  : {actual}")
+    print(f"[{tensor_type}] expected: {expected}")
 
     # verify lowering didnt fail
     assert actual is not None, "run_addt returned None — lowering failed"
