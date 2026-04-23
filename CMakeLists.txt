@@ -31,6 +31,7 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(include)
+add_subdirectory(python)
 add_subdirectory(lib)
 add_subdirectory(calc-opt)
 add_subdirectory(test)

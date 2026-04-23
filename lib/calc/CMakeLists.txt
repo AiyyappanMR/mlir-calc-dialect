@@ -10,6 +10,7 @@ add_mlir_dialect_library(MLIRCalc
     DEPENDS
     MLIRcalcOpsIncGen
     MLIRCalcPassesIncGen
+    CalcPythonOpsGen
 
     LINK_LIBS PUBLIC
     MLIRIR
