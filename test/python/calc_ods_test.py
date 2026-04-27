@@ -12,6 +12,7 @@ if MLIR_CORE_PATH not in sys.path:
     sys.path.insert(0, MLIR_CORE_PATH)
 
 from mlir.ir import Context, Module, Location
+from mlir.passmanager import PassManager
 from mlir.dialects._ods_common import _cext
 
 # register our custom dialect with the mlir 
@@ -34,7 +35,10 @@ def test_ods_bindings():
         }
         """
         module = Module.parse(ir)
-        print("success")
+        # lower our custom calc dialect ops to standard arith ops using our registered pass
+        pm = PassManager.parse("builtin.module(calc-to-arith)")
+        pm.run(module.operation)
+        print(module)
 
 if __name__ == "__main__":
     test_ods_bindings()

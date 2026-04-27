@@ -14,4 +14,9 @@ add_mlir_dialect_library(MLIRCalc
 
     LINK_LIBS PUBLIC
     MLIRIR
+    MLIRFuncDialect
+    MLIRArithDialect
+    MLIRTosaDialect
+    MLIRTransforms
+    MLIRPass
 )
