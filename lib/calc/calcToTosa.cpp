@@ -152,6 +152,60 @@ class convertAddcmulOp : public mlir::OpRewritePattern<calc::addcmulOp> {
 };
 } // namespace
 
+namespace {
+class convertLogaddexp2Op : public mlir::OpRewritePattern<calc::logaddexp2Op> {
+    using mlir::OpRewritePattern<calc::logaddexp2Op>::OpRewritePattern;
+
+    mlir::LogicalResult
+    matchAndRewrite(calc::logaddexp2Op op,
+    mlir::PatternRewriter &rewriter) const override {
+    // Get the tensor operands and the result type and shape from the logaddexp2Op
+    mlir::Value input1 = op.getInput1();
+    mlir::Value input2 = op.getInput2();
+    mlir::ShapedType resultType =
+    llvm::cast<mlir::ShapedType>(op.getResult().getType());
+
+    // Create a constant shift value of 0 for the tosa::MulOp
+    mlir::RankedTensorType shiftType =
+    mlir::RankedTensorType::get({1}, rewriter.getI8Type()); // {1} not {}
+    mlir::DenseElementsAttr shiftAttr =
+    mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+    mlir::Value shift =
+    mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr); 
+    // Create a constant tensor with the same shape as the input tensors and all values set to 
+    // 2.0 for the tosa::PowOp and tosa::LogOp.
+    mlir::DenseElementsAttr twoTensorAttr = 
+    mlir::DenseElementsAttr::get(resultType, rewriter.getF64FloatAttr(2.0));
+    mlir::Value twoTensor =
+    mlir::tosa::ConstOp::create(rewriter, op.getLoc(), resultType, twoTensorAttr);
+
+    // compute 2^input1 and 2^input2 using tosa::PowOp, then add the results together.
+    mlir::Value pow_input1 = mlir::tosa::PowOp::create(
+    rewriter, op.getLoc(), resultType, twoTensor, input1);
+    mlir::Value pow_input2 = mlir::tosa::PowOp::create(
+    rewriter, op.getLoc(), resultType, twoTensor, input2);
+    mlir::Value add_pow = mlir::tosa::AddOp::create(
+    rewriter, op.getLoc(), resultType, pow_input1, pow_input2);
+
+    // compute log(2^input1 + 2^input2) and log(2) using tosa::LogOp, because log base 2 is not supported in tosa. 
+    mlir::Value log_add_pow_val = mlir::tosa::LogOp::create(
+    rewriter, op.getLoc(), resultType, add_pow);
+    mlir::Value log2_val = mlir::tosa::LogOp::create(
+    rewriter, op.getLoc(), resultType, twoTensor);
+
+    // Also in tosa, there is no div op specifically, so we compute the reciprocal of log(2) and 
+    // then multiply it with log(2^input1 + 2^input2) to get the final result.
+    // Result = log(2^input1 + 2^input2) / log(2) = log(2^input1 + 2^input2) * (1/log(2))
+    mlir::Value recip = mlir::tosa::ReciprocalOp::create(
+    rewriter, op.getLoc(), resultType, log2_val);
+    mlir::Value result = mlir::tosa::MulOp::create(
+    rewriter, op.getLoc(), resultType, log_add_pow_val, recip, shift);
+    rewriter.replaceOp(op, result);
+    return mlir::success();
+    }
+};
+} // namespace
+
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -174,6 +228,10 @@ public:
     // Adding addtOp to the illegal ops.
     target.addIllegalOp<addtOp>();
     patterns.add<convertTensorWiseOp<addtOp, mlir::tosa::AddOp>>(&getContext());
+
+    // Adding logaddexp2Op to the illegal ops.
+    target.addIllegalOp<logaddexp2Op>();
+    patterns.add<convertLogaddexp2Op>(&getContext());
 
     // Adding addcmulOp to the illegal ops.
     target.addIllegalOp<addcmulOp>();

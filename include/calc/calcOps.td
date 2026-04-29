@@ -58,6 +58,19 @@ def calc_addcmulOp : calc_Op<"addcmul",[Pure, SameOperandsAndResultElementType, 
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
+def calc_logaddexp2Op : calc_Op<"logaddexp2", [Pure, Commutative, SameOperandsAndResultElementType, SameOperandsAndResultRank, ResultsBroadcastableShape]> {
+    let summary = "Add two tensors in log space with base 2";
+    let description = [{
+    Computes the logarithm of the sum of exponentiations of the inputs in log space with base 2.
+    '''
+    Output = log2(2^input1 + 2^input2)
+    '''
+    }];
+    let arguments = (ins RankedTensorOf<[AnyFloat]>:$input1, RankedTensorOf<[AnyFloat]>:$input2);
+    let results = (outs RankedTensorOf<[AnyFloat]>:$result);
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+}
+
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Multiply two values";
     let description = [{
