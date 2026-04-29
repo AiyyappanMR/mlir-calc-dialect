@@ -7,7 +7,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 
 include "mlir/IR/OpBase.td"
 //include "mlir/Bytecode/BytecodeOpInterface.td"
-include "calcDialect.td"
+include "calc/calcDialect.td"
 
 def calc_constOp : calc_Op<"const", [Pure]> {
     let summary = "To get literal value";

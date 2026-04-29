@@ -9,8 +9,7 @@ add_mlir_dialect_library(MLIRCalc
 
     DEPENDS
     MLIRcalcOpsIncGen
-    MLIRCalcPassesIncGen
-    CalcPythonOpsGen
+    MLIRCalcTransformsIncGen
 
     LINK_LIBS PUBLIC
     MLIRIR
