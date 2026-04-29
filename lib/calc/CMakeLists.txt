@@ -9,8 +9,13 @@ add_mlir_dialect_library(MLIRCalc
 
     DEPENDS
     MLIRcalcOpsIncGen
-    MLIRCalcPassesIncGen
+    MLIRCalcTransformsIncGen
 
     LINK_LIBS PUBLIC
     MLIRIR
+    MLIRFuncDialect
+    MLIRArithDialect
+    MLIRTosaDialect
+    MLIRTransforms
+    MLIRPass
 )
