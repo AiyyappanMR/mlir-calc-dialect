@@ -17,4 +17,10 @@ def calc_Dialect : Dialect {
 class calc_Op<string mnemonic, list<Trait> traits = []> 
     : Op<calc_Dialect, mnemonic, traits>;
 
+class CalcOpTrait<string mnemonic> : NativeOpTrait<mnemonic> {
+    let cppNamespace = "::calc::OpTrait";
+}
+
+def OperandsMustbeFloat : CalcOpTrait<"OperandsMustbeFloat"> ;
+
 #endif
