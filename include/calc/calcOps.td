@@ -24,7 +24,7 @@ def calc_constOp : calc_Op<"const", [Pure]> {
     //let assemblyFormat = "attr-dict $value";
 }
 
-def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType]> {
+def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType, OperandsMustbeFloat]> {
     let summary = "Add two scaler values";
     let description = [{
         Adds two scalar integer or float values of the same type.
