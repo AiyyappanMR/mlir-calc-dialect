@@ -9,11 +9,18 @@ using namespace calc;
 #define GET_OP_CLASSES
 #include "calc/calcOps.cpp.inc"
 
+#define GET_PATTERN_CLASSES
+#include "calc/calcPatterns.cpp.inc" 
+
 // Pattern to fuse addt and mult into addcmul.
 // %0 = calc.mult %a, %b
 // %1 = calc.addt %c, %0
 // Replaces with:
 // %1 = calc.addcmul %c, %a, %b
+
+
+// C++ pattern commented out — replaced by DRR pattern in calcPatterns.td
+/*
 struct FuseAddMul : public OpRewritePattern<calc::addtOp> {
     using OpRewritePattern::OpRewritePattern;
     LogicalResult matchAndRewrite(calc::addtOp Op, PatternRewriter &rewriter) const override {
@@ -41,8 +48,10 @@ struct FuseAddMul : public OpRewritePattern<calc::addtOp> {
         return success();
     }
 };
+*/
 
 // Canonicalization pattern to fuse addt and mult into addcmul.
 void calc::addtOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
-  results.add<FuseAddMul>(context);
+  // results.add<FuseAddMul>(context);
+  populateWithGenerated(results);
 }

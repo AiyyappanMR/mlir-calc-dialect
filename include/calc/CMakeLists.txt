@@ -6,3 +6,7 @@ mlir_tablegen(calcPasses.h.inc -gen-pass-decls -name Calc)
 mlir_tablegen(calcTransforms.capi.h.inc -gen-pass-capi-header --prefix Calc)
 mlir_tablegen(calcTransforms.capi.cpp.inc -gen-pass-capi-impl --prefix Calc)
 add_public_tablegen_target(MLIRCalcTransformsIncGen)
+
+set(LLVM_TARGET_DEFINITIONS calcPatterns.td)
+mlir_tablegen(calcPatterns.cpp.inc -gen-rewriters)
+add_public_tablegen_target(MLIRCalcPatternsIncGen)

@@ -10,7 +10,8 @@ add_mlir_dialect_library(MLIRCalc
     DEPENDS
     MLIRcalcOpsIncGen
     MLIRCalcTransformsIncGen
-
+    MLIRCalcPatternsIncGen
+    
     LINK_LIBS PUBLIC
     MLIRIR
     MLIRFuncDialect
