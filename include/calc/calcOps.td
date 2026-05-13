@@ -42,6 +42,17 @@ def calc_addtOp : calc_Op<"addt", [Pure, Commutative, SameOperandsAndResultRank,
     let arguments = (ins RankedTensorOf<[AnyInteger, AnyFloat]>:$input1,RankedTensorOf<[AnyInteger, AnyFloat]>:$input2);
     let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+    let hasCanonicalizer = 1;
+}
+
+def calc_multOp : calc_Op<"mult", [Pure, Commutative, SameOperandsAndResultRank, SameOperandsAndResultElementType, ResultsBroadcastableShape]> {
+    let summary = "Multiply two tensor values";
+    let description = [{
+        Multiplies two tensors of identical shape and element type.
+    }];
+    let arguments = (ins RankedTensorOf<[AnyInteger, AnyFloat]>:$input1,RankedTensorOf<[AnyInteger, AnyFloat]>:$input2);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
 def calc_addcmulOp : calc_Op<"addcmul",[Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, ResultsBroadcastableShape]> {
