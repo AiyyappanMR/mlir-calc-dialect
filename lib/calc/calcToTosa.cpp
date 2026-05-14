@@ -206,6 +206,77 @@ class convertLogaddexp2Op : public mlir::OpRewritePattern<calc::logaddexp2Op> {
 };
 } // namespace
 
+namespace {
+class convertMinimumOp : public mlir::OpRewritePattern<calc::minimumOp> {
+    using mlir::OpRewritePattern<calc::minimumOp>::OpRewritePattern;
+    mlir::LogicalResult matchAndRewrite(calc::minimumOp op, mlir::PatternRewriter &rewriter) const override {
+        // Get the tensor operands and the result type and shape from the logaddexp2Op
+        mlir::Value input1 = op.getInput1();
+        mlir::Value input2 = op.getInput2();
+        mlir::ShapedType resultType =
+        llvm::cast<mlir::ShapedType>(op.getResult().getType());
+        mlir::Type elementType = resultType.getElementType();
+
+        // Minimum(a, b) = ((a + b) - abs(a - b)) / 2
+        mlir::Value out1 = mlir::tosa::AddOp::create(
+        rewriter, op.getLoc(), resultType, input1, input2);
+        mlir::Value out2 = mlir::tosa::SubOp::create(
+        rewriter, op.getLoc(), resultType, input1, input2);
+        mlir::Value abs_out = mlir::tosa::AbsOp::create(
+        rewriter, op.getLoc(), resultType, out2);
+        mlir::Value sub_out = mlir::tosa::SubOp::create(
+        rewriter, op.getLoc(), resultType, out1, abs_out);
+
+        // Create a constant tensor with the same shape as the input tensors and all values set to 2 or 2.0 for the tosa::ReciprocalOp.
+        // Check if the element type is integer or float to determine the value of the constant tensor.
+        mlir::DenseElementsAttr twoTensorAttr;
+        if (elementType.isInteger(32)){
+            twoTensorAttr = mlir::DenseElementsAttr::get(resultType, rewriter.getI32IntegerAttr(2));
+        }
+        else if (elementType.isInteger(64)){
+            twoTensorAttr = mlir::DenseElementsAttr::get(resultType, rewriter.getI64IntegerAttr(2));
+        }
+        else if (elementType.isF32()){
+            twoTensorAttr = mlir::DenseElementsAttr::get(resultType, rewriter.getF32FloatAttr(2.0));
+        }
+        else if (elementType.isF64()){
+            twoTensorAttr = mlir::DenseElementsAttr::get(resultType, rewriter.getF64FloatAttr(2.0));
+        }
+        else {
+            return rewriter.notifyMatchFailure(op, "unsupported element type");
+        }
+        mlir::Value twoTensor = mlir::tosa::ConstOp::create(rewriter, op.getLoc(), resultType, twoTensorAttr);
+
+        // Create a constant shift value of 0 for the tosa::MulOp
+        mlir::RankedTensorType shiftType =
+        mlir::RankedTensorType::get({1}, rewriter.getI8Type()); // {1} not {}
+        mlir::DenseElementsAttr shiftAttr =
+        mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+        mlir::Value shift =
+        mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr);
+        
+        // calculate the reciprocal of 2 and then multiply it with the sub_out to get the final result.
+        mlir::Value result;
+        if (llvm::isa<mlir::IntegerType>(elementType)) {
+            // For integer types, we need to use the tosa::DivOp instead of multiplying by the reciprocal, because the reciprocal of 2 would be 0 in integer division.
+            result = mlir::tosa::IntDivOp::create(
+            rewriter, op.getLoc(), resultType, sub_out, twoTensor);
+        }
+        else if (llvm::isa<mlir::FloatType>(elementType)) {
+            // For float types, we can directly multiply by the reciprocal of 2 to get the final result.
+            mlir::Value recip = mlir::tosa::ReciprocalOp::create(
+            rewriter, op.getLoc(), resultType, twoTensor);
+            result = mlir::tosa::MulOp::create(
+            rewriter, op.getLoc(), resultType, sub_out, recip, shift);
+        }
+        rewriter.replaceOp(op, result);
+        return mlir::success();
+    }
+};
+} // namespace
+
+
+
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -232,6 +303,10 @@ public:
     // Adding logaddexp2Op to the illegal ops.
     target.addIllegalOp<logaddexp2Op>();
     patterns.add<convertLogaddexp2Op>(&getContext());
+
+    // Adding minimumOp to the illegal ops.
+    target.addIllegalOp<minimumOp>();
+    patterns.add<convertMinimumOp>(&getContext());
 
     // Adding addcmulOp to the illegal ops.
     target.addIllegalOp<addcmulOp>();
