@@ -80,3 +80,18 @@ func.func @test_minimum_2d_i64(%arg0: tensor<4x2xi64>, %arg1: tensor<4x2xi64>) -
     %0 = calc.minimum %arg0, %arg1 : (tensor<4x2xi64>, tensor<4x2xi64>) -> tensor<4x2xi64>
     return %0 : tensor<4x2xi64>
 }
+
+// Test 6: 2D i64 with broadcasting
+// CHECK-LABEL: func.func @test_minimum_2d_broadcast_i64
+// CHECK-SAME:    ([[ARG0:%.+]]: tensor<4x2xi64>, [[ARG1:%.+]]: tensor<4x1xi64>) -> tensor<4x2xi64>
+func.func @test_minimum_2d_broadcast_i64(%arg0: tensor<4x2xi64>, %arg1: tensor<4x1xi64>) -> tensor<4x2xi64> {
+    // CHECK-DAG: [[ADD:%.+]] = tosa.add [[ARG0]], [[ARG1]] : (tensor<4x2xi64>, tensor<4x1xi64>) -> tensor<4x2xi64>
+    // CHECK-DAG: [[SUB1:%.+]] = tosa.sub [[ARG0]], [[ARG1]] : (tensor<4x2xi64>, tensor<4x1xi64>) -> tensor<4x2xi64>
+    // CHECK-DAG: [[ABS:%.+]] = tosa.abs [[SUB1]] : (tensor<4x2xi64>) -> tensor<4x2xi64>
+    // CHECK-DAG: [[SUB2:%.+]] = tosa.sub [[ADD]], [[ABS]] : (tensor<4x2xi64>, tensor<4x2xi64>) -> tensor<4x2xi64>
+    // CHECK-DAG: [[TWO:%.+]] = "tosa.const"() <{values = dense<2> : tensor<4x2xi64>}>  : () -> tensor<4x2xi64>
+    // CHECK-DAG: [[DIV:%.+]] = tosa.intdiv [[SUB2]], [[TWO]] : (tensor<4x2xi64>, tensor<4x2xi64>) -> tensor<4x2xi64>
+    // CHECK-NEXT: return [[DIV]] : tensor<4x2xi64>
+    %0 = calc.minimum %arg0, %arg1 : (tensor<4x2xi64>, tensor<4x1xi64>) -> tensor<4x2xi64>
+    return %0 : tensor<4x2xi64>
+}

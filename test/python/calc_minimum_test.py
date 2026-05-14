@@ -53,26 +53,34 @@ def CalcToLLVM(module):
 
 
 # calc.minimum IR template which takes the tensor type and shape from the argument
-def build_ir(tensor_type):
-    tensor_type = f"tensor<{tensor_type}>"
+def build_ir(input1_type, input2_type, result_type):
+    input1_tensor = f"tensor<{input1_type}>"
+    input2_tensor = f"tensor<{input2_type}>"
+    result_tensor = f"tensor<{result_type}>"
     
-    # emit_c_interface needed for ExecutionEngine to execute
+    # emit_c_interface needed for ExecutionEngine to execute    
     ir = f"""
-func.func @test_minimum(%arg0: {tensor_type}, %arg1: {tensor_type}) -> {tensor_type} attributes {{llvm.emit_c_interface}} {{
-  %0 = "calc.minimum"(%arg0, %arg1) : ({tensor_type}, {tensor_type}) -> {tensor_type}
-  return %0 : {tensor_type}
+func.func @test_minimum(%arg0: {input1_tensor}, %arg1: {input2_tensor}) -> {result_tensor} attributes {{llvm.emit_c_interface}} {{
+  %0 = "calc.minimum"(%arg0, %arg1) : ({input1_tensor}, {input2_tensor}) -> {result_tensor}
+  return %0 : {result_tensor}
 }}
 """
     return ir
 
 # Main function which calls all the other function to lower the calc.minimum op to llvm IR and executes them.
-def run_minimum(input1, input2, tensor_type):
+def run_minimum(input1, input2, input1_type, input2_type, result_type):
     
     # lowers calc to tosa
-    calc_ir = build_ir(tensor_type)
+    calc_ir = build_ir(input1_type, input2_type, result_type)
+
+    # parsing the result type to get the output shape and dtype for initializing the result memref descriptor. 
+    output_shape = []
+    for i in result_type.split("x")[:-1]:
+        output_shape.append(int(i))
+    output_type = input1.numpy().dtype
 
     # Initializing a result array to store the output
-    result = np.zeros_like(input1.numpy())
+    result = np.zeros(output_shape, dtype=output_type)
     with Context() as ctx:
 
         register_dialect(ctx)
@@ -111,42 +119,55 @@ MINIMUM_TEST_CASES = [
     (
         torch.tensor([1.0, 3.0, -2.0, 5.0]),
         torch.tensor([4.0, -1.0, 3.0, 2.0]),
-        "4xf32",
+        "4xf32","4xf32","4xf32"
     ),
     # 2D f32 — random 3x3
     (
         torch.randn(3, 3, dtype=torch.float32),
         torch.randn(3, 3, dtype=torch.float32),
-        "3x3xf32",
+        "3x3xf32","3x3xf32","3x3xf32"
     ),
     # 1D f32 — random 6 elements
     (
         torch.randn(6, dtype=torch.float32),
         torch.randn(6, dtype=torch.float32),
-        "6xf32",
+        "6xf32","6xf32","6xf32"
     ),
     # 1D f64 — random 8 elements
     (
         torch.randn(8, dtype=torch.float64),
         torch.randn(8, dtype=torch.float64),
-        "8xf64",
+        "8xf64","8xf64","8xf64"
     ),
     # 2D i64 — random 2x4
     (
         torch.randint(0, 10, (2, 4), dtype=torch.int64),
         torch.randint(0, 10, (2, 4), dtype=torch.int64),
-        "2x4xi64",
+        "2x4xi64","2x4xi64","2x4xi64"
     ),
     # 3D i32 — random 2x2x2
     (
         torch.randint(0, 10, (2, 2, 2), dtype=torch.int32),
         torch.randint(0, 10, (2, 2, 2), dtype=torch.int32),
-        "2x2x2xi32",
+        "2x2x2xi32","2x2x2xi32","2x2x2xi32"
     ),
+    # 3D i32 — random 2x1x2 and 2x2x1 to test broadcasting
+    (
+        torch.randint(1, 10, (2, 1, 2), dtype=torch.int32),
+        torch.randint(0, 10, (2, 2, 1), dtype=torch.int32),
+        "2x1x2xi32","2x2x1xi32","2x2x2xi32"
+    ),
+    # 2D i64 — random 4x2 and 4x1 to test broadcasting
+    (
+        torch.randint(1, 10, (4, 2), dtype=torch.int64),
+        torch.randint(0, 10, (4, 1), dtype=torch.int64),
+        "4x2xi64","4x1xi64","4x2xi64"
+    )
+
 ]
 
-@pytest.mark.parametrize("input1, input2, tensor_type", MINIMUM_TEST_CASES)
-def test_minimum(input1, input2, tensor_type):
+@pytest.mark.parametrize("input1, input2, input1_type, input2_type, result_type", MINIMUM_TEST_CASES)
+def test_minimum(input1, input2, input1_type, input2_type, result_type):
     
     # print the input tensors 
     print(f"\n input1: {input1}")
@@ -154,7 +175,7 @@ def test_minimum(input1, input2, tensor_type):
 
     # actual and calc outputs 
     expected = torch.minimum(input1, input2).numpy()
-    actual = run_minimum(input1, input2, tensor_type)
+    actual = run_minimum(input1, input2, input1_type, input2_type, result_type)
 
     print(f"\n calc output  : {actual}")
     print(f" torch output : {expected}")

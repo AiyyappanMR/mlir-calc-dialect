@@ -213,9 +213,18 @@ class convertMinimumOp : public mlir::OpRewritePattern<calc::minimumOp> {
         // Get the tensor operands and the result type and shape from the logaddexp2Op
         mlir::Value input1 = op.getInput1();
         mlir::Value input2 = op.getInput2();
-        mlir::ShapedType resultType =
-        llvm::cast<mlir::ShapedType>(op.getResult().getType());
-        mlir::Type elementType = resultType.getElementType();
+
+        // Compute broadcasted result shape explicitly
+        auto input1Type = llvm::cast<mlir::ShapedType>(input1.getType());
+        auto input2Type = llvm::cast<mlir::ShapedType>(input2.getType());
+        llvm::SmallVector<int64_t> broadcastedShape;
+        if (!mlir::OpTrait::util::getBroadcastedShape(
+                input1Type.getShape(), input2Type.getShape(), broadcastedShape)) {
+            return rewriter.notifyMatchFailure(op, "shapes are not broadcastable");
+        }
+
+        mlir::Type elementType = input1Type.getElementType();
+        mlir::ShapedType resultType = mlir::RankedTensorType::get(broadcastedShape, elementType);
 
         // Minimum(a, b) = ((a + b) - abs(a - b)) / 2
         mlir::Value out1 = mlir::tosa::AddOp::create(
