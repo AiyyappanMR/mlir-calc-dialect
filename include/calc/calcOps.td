@@ -82,7 +82,7 @@ def calc_logaddexp2Op : calc_Op<"logaddexp2", [Pure, Commutative, SameOperandsAn
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
-def calc_minimumOp : calc_Op<"minimum", [Pure, Commutative, SameOperandsAndResultRank, SameOperandsAndResultElementType]>{
+def calc_minimumOp : calc_Op<"minimum", [Pure, Commutative, SameOperandsAndResultElementType, ResultsBroadcastableShape]> {
     let summary = "performs element-wise minimum of two tensors";
     let description = [{
     Computes the element-wise minimum of two tensors of identical shape and element type.

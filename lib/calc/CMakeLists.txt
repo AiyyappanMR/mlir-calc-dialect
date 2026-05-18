@@ -1,4 +1,5 @@
 add_mlir_dialect_library(MLIRCalc
+    broadcast.cpp
     calcDialect.cpp
     calcOps.cpp
     calcToArith.cpp
