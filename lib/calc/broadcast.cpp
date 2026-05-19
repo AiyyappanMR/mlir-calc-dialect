@@ -80,7 +80,7 @@ mlir::LogicalResult EqualizeRanks(mlir::PatternRewriter &rewriter, mlir::Locatio
     // Build a tosa.const_shape value: !tosa.shape<N> holding the target dims as index elements
     auto shapeType = mlir::tosa::shapeType::get(builder.getContext(), reshapeOutputShape.size());
     auto shapeAttr = builder.getIndexTensorAttr(reshapeOutputShape);
-    mlir::Value reshapeOutputShapeValue = mlir::tosa::ConstShapeOp::create(builder, shapeType, shapeAttr)->getResult(0);
+    mlir::Value reshapeOutputShapeValue = mlir::tosa::ConstShapeOp::create(builder, shapeType, shapeAttr);
 
     // ReshapeOp::create with ImplicitLocOpBuilder takes (builder, resultType, input, shape)
     auto reshapeLower = mlir::tosa::ReshapeOp::create(
@@ -97,10 +97,93 @@ mlir::LogicalResult EqualizeRanks(mlir::PatternRewriter &rewriter, mlir::Locatio
     return mlir::success();
 }
 
+mlir::LogicalResult matchingShapes(llvm::ArrayRef<int64_t> shape1, llvm::ArrayRef<int64_t> shape2, llvm::SmallVector<int64_t> &outputShape) {
+    // Compute the output shape based on the broadcasting rules. If the shapes are not compatible for broadcasting, 
+    // return failure.
+    auto rank = shape1.size();
+    for (int64_t i = 0; i < rank; i++) {
+        int64_t dim1 = shape1[i];
+        int64_t dim2 = shape2[i];
+        if (dim1 != dim2 && (dim1 != 1 && dim1 != mlir::ShapedType::kDynamic) && (dim2 != 1 && dim2 != mlir::ShapedType::kDynamic)) {
+            return mlir::failure();
+        }
+        // if one of the dimensions is 1, the output dimension is the other dimension.
+        outputShape[i] = (dim1 == 1) ? dim2 : dim1;
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult EqualizeShapes(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value &input1, mlir::Value &input2) {
+    mlir::ImplicitLocOpBuilder builder(loc, rewriter);
+
+    // Get the input tensor types and shapes
+    mlir::ArrayRef<int64_t> input1Ty = llvm::dyn_cast<mlir::RankedTensorType>(input1.getType()).getShape();
+    mlir::ArrayRef<int64_t> input2Ty = llvm::dyn_cast<mlir::RankedTensorType>(input2.getType()).getShape();
+
+    // Create a vector to hold the output shape of the tile operation.
+    llvm::SmallVector<int64_t> outputShape(input1Ty.size(), 1);
+
+    // Compute the output shape.
+    if (matchingShapes(input1Ty, input2Ty, outputShape).failed()) {
+        return mlir::failure();
+    }
+
+    // Create a new ranked tensor type for the output of the tile operation, which has the same element type 
+    // as the input tensors and the shape of the computed output shape.
+    auto inputElementType = llvm::cast<mlir::RankedTensorType>(input1.getType()).getElementType();
+    auto outputshapeType = mlir::RankedTensorType::get(llvm::ArrayRef<int64_t>(outputShape), inputElementType);
+
+    // For each dimension, determine if either input tensor needs to be tiled.
+    // For example, outshape is [4, 4, 4], input1 shape is [4, 4, 4], input2 shape is [4, 1, 4], 
+    // then multiples1 is [1, 1, 1] and multiples2 is [1, 4, 1].
+    auto rank = outputShape.size();
+    llvm::SmallVector<int64_t> multiples1(rank), multiples2(rank);
+    bool input1NeedsTile = false, input2NeedsTile = false;
+    for (size_t i = 0; i < rank; i++) {
+        // Default both dimensions to no tiling (multiple of 1)
+        multiples1[i] = 1;
+        multiples2[i] = 1;
+
+        // Check if input1 needs to be stretched along this axis
+        if (input1Ty[i] == 1 && outputShape[i] != 1) {
+            multiples1[i] = outputShape[i];
+            input1NeedsTile = true;
+        }
+
+        // Check if input2 needs to be stretched along this axis
+        if (input2Ty[i] == 1 && outputShape[i] != 1) {
+            multiples2[i] = outputShape[i];
+            input2NeedsTile = true;
+        }
+    }
+
+    // If neither input tensor needs to be tiled, we can return success without modifying the inputs.
+    if (!input1NeedsTile && !input2NeedsTile)
+        return mlir::success();
+
+
+    // Build tosa.tile operations for the input tensors that need to be tiled.
+    auto shapeType = mlir::tosa::shapeType::get(builder.getContext(), rank);
+
+    if (input1NeedsTile) {
+        auto multiplesAttr = builder.getIndexTensorAttr(multiples1);
+        mlir::Value multiplesValue = mlir::tosa::ConstShapeOp::create(builder, shapeType, multiplesAttr);
+        input1 = mlir::tosa::TileOp::create(builder, outputshapeType, input1, multiplesValue);
+    }
+    if (input2NeedsTile) {
+        auto multiplesAttr = builder.getIndexTensorAttr(multiples2);
+        mlir::Value multiplesValue = mlir::tosa::ConstShapeOp::create(builder, shapeType, multiplesAttr);
+        input2 = mlir::tosa::TileOp::create(builder, outputshapeType, input2, multiplesValue);
+    }
+
+     return mlir::success();
+
+}
+
 
 // This function computes the broadcasted shape of two input tensors and checks if they are compatible for broadcasting. 
 // If they are, it returns the broadcasted shape; otherwise, it returns a failure.
-mlir::LogicalResult ConvertRank(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::RankedTensorType outputType, mlir::Value &lhs, mlir::Value &rhs) {
+mlir::LogicalResult broadcast(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::RankedTensorType outputType, mlir::Value &lhs, mlir::Value &rhs) {
     
     // Get the input tensor types and shapes
     auto lhsTy = llvm::dyn_cast<mlir::RankedTensorType>(lhs.getType());
@@ -115,9 +198,9 @@ mlir::LogicalResult ConvertRank(mlir::PatternRewriter &rewriter, mlir::Location 
     int64_t input1Rank = lhsTy.getRank();
     int64_t input2Rank = rhsTy.getRank();
 
-    // If the ranks are already equal, no need to reshape
-    if (input1Rank == input2Rank) {
-        return rewriter.notifyMatchFailure(loc, "cannot rewrite as its already correct");
+    // If the shapes of the input tensors are already the same, there is no need to broadcast.
+    if (lhsTy.getShape() == rhsTy.getShape()) {
+        return rewriter.notifyMatchFailure(loc, "Have matching shapes, no need to broadcast");
     }
 
     // Create a copy of the input tensors to modify
@@ -126,15 +209,24 @@ mlir::LogicalResult ConvertRank(mlir::PatternRewriter &rewriter, mlir::Location 
 
     
     // Use the EqualizeRanks function to reshape the lower-rank tensor to match the higher rank
-    if (EqualizeRanks(rewriter, loc, newlhs, newrhs).failed()) {
-        return rewriter.notifyMatchFailure(loc, "failed to reshape ranks");
+    if (input1Rank != input2Rank) {
+        if (EqualizeRanks(rewriter, loc, newlhs, newrhs).failed()) {
+            return rewriter.notifyMatchFailure(loc, "failed to reshape ranks");
+        }
     }
 
-    // Check if the reshaped tensors are compatible with the output type's shape.
+    if (EqualizeShapes(rewriter, loc, newlhs, newrhs).failed()) {
+        return rewriter.notifyMatchFailure(loc, "failed to reshape shapes");
+    }
+
+    // Check if the reshaped tensors are compatible with the output type's shape and rank.
     if (outputType) {
         if (outputType.getRank() != llvm::cast<mlir::RankedTensorType>(newlhs.getType()).getRank() ||
-            outputType.getRank() != llvm::cast<mlir::RankedTensorType>(newrhs.getType()).getRank())
+            outputType.getRank() != llvm::cast<mlir::RankedTensorType>(newrhs.getType()).getRank() ||
+            outputType.getShape() != llvm::cast<mlir::RankedTensorType>(newlhs.getType()).getShape() ||
+            outputType.getShape() != llvm::cast<mlir::RankedTensorType>(newrhs.getType()).getShape()) {
             return rewriter.notifyMatchFailure(loc, "the reshaped type doesn't agrees with the ranked output type");
+        }
     }
 
     // Update the original input tensors with the new reshaped tensors
@@ -164,7 +256,7 @@ class BroadcastPattern : public mlir::OpRewritePattern<CalcOp> {
         }
 
         // lhs and rhs are passed by reference so ConvertRank can update them with the reshaped values
-        if (ConvertRank(rewriter, op.getLoc(), outputType, lhs, rhs).failed()) {
+        if (broadcast(rewriter, op.getLoc(), outputType, lhs, rhs).failed()) {
             return mlir::failure();
         }
 
