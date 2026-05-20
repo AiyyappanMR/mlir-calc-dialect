@@ -13,6 +13,17 @@
 #define GEN_PASS_DEF_CALCTOTOSAPASS
 #include "calc/calcPasses.h.inc"
 
+mlir::LogicalResult ToFloat(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value &input, mlir::Type targetFloatType) {
+    // Check if the input tensor is already of float type, if so, no need to cast.
+    mlir::RankedTensorType inputTensorType = llvm::cast<mlir::RankedTensorType>(input.getType());
+    if (llvm::isa<mlir::FloatType>(inputTensorType.getElementType())) {
+        return mlir::success();
+    }
+    mlir::RankedTensorType castResultType = mlir::RankedTensorType::get(inputTensorType.getShape(), targetFloatType);
+    input = mlir::tosa::CastOp::create(rewriter, loc, castResultType, input);
+    return mlir::success();
+}
+
 namespace { // class converter will be implemented here
 template <typename CalcOp, typename tosaOp>
 class convertElemWiseOp : public mlir::OpRewritePattern<CalcOp> {
@@ -276,6 +287,78 @@ class convertMinimumOp : public mlir::OpRewritePattern<calc::minimumOp> {
 } // namespace
 
 
+namespace {
+class convertEntrOp : public mlir::OpRewritePattern<calc::entrOp> {
+    using mlir::OpRewritePattern<calc::entrOp>::OpRewritePattern;
+    mlir::LogicalResult matchAndRewrite(calc::entrOp op, mlir::PatternRewriter &rewriter) const override {
+
+        mlir::Location loc = op.getLoc();
+
+        // Get the tensor operand 
+        mlir::Value input = op.getInput();
+        mlir::ShapedType inputType = llvm::cast<mlir::ShapedType>(input.getType());
+        mlir::Type elemType = inputType.getElementType();
+
+        // Get the result type
+        mlir::Value result = op.getResult();
+        mlir::ShapedType resultType = llvm::cast<mlir::ShapedType>(result.getType());
+        mlir::Type resultElemType = resultType.getElementType();
+
+        // If the element type of the input tensor is not a float type, we need to convert it to a float type before 
+        // lowering to tosa.
+        if (!elemType.isF32() && !elemType.isF64()) {
+            if ((ToFloat(rewriter, op.getLoc(), input, resultElemType)).failed()) {
+                return rewriter.notifyMatchFailure(op, "failed to convert integer to float");
+            }
+            // After conversion, we need to update the inputType and elemType.
+            inputType = llvm::cast<mlir::ShapedType>(input.getType());
+            elemType = inputType.getElementType();
+        }
+
+        // Get masks for input == 0, and input < 0
+        mlir::DenseElementsAttr zeroTensorAttr = mlir::DenseElementsAttr::get(inputType, rewriter.getFloatAttr(elemType, 0.0));
+        mlir::Value zeroTensor = mlir::tosa::ConstOp::create(rewriter, op.getLoc(), inputType, zeroTensorAttr);
+        
+        mlir::RankedTensorType MaskType = mlir::RankedTensorType::get(inputType.getShape(), rewriter.getI1Type());
+        mlir::Value eqMask = mlir::tosa::EqualOp::create(rewriter, op.getLoc(), MaskType, input, zeroTensor);
+        mlir::Value ltMask = mlir::tosa::GreaterOp::create(rewriter, loc, MaskType, zeroTensor, input);
+
+        // Create a constant shift value of 0 for the tosa::MulOp
+        mlir::RankedTensorType shiftType =
+        mlir::RankedTensorType::get({1}, rewriter.getI8Type()); // {1} not {}
+        mlir::DenseElementsAttr shiftAttr =
+        mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+        mlir::Value shift =
+        mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr);
+
+        // Compute the entropy using the formula: entr(x) = -x * log(x) for whole tensor.
+        mlir::Value logVal = mlir::tosa::LogOp::create(rewriter, loc, resultType, input);
+        mlir::Value mulVal = mlir::tosa::MulOp::create(rewriter, loc, resultType, input, logVal, shift);
+        mlir::Value entrPositive = mlir::tosa::NegateOp::create(rewriter, loc, resultType, mulVal);
+
+        // Create a constant tensor with the same shape as the input tensor and all values set to negative infinity.
+        mlir::DenseElementsAttr negInfAttr = mlir::DenseElementsAttr::get(resultType, rewriter.getFloatAttr(resultElemType, -std::numeric_limits<double>::infinity()));
+        mlir::Value negInfTensor = mlir::tosa::ConstOp::create(rewriter, loc, resultType, negInfAttr);
+
+        // first select op to select between entrPositive and zeroTensor based on eqMask.
+        // eg : [0.5, -1.0, 0.0, 2.0] -> [entr(0.5), entr(-1.0), entr(0.0), entr(2.0)] 
+        // eqMask : [false, false, true, false] 
+        // after first select : [entr(0.5), entr(-1.0), 0.0, entr(2.0)]
+        mlir::Value out1 = mlir::tosa::SelectOp::create(rewriter, loc, resultType, eqMask, zeroTensor, entrPositive);
+
+        // second select op to select between entrPositive and negative infinity based on ltMask.
+        // eg : [entr(0.5), entr(-1.0), 0.0, entr(2.0)]
+        // ltMask : [false, true, false, false]
+        // final output : [entr(0.5), -inf, 0.0, entr(2.0)]
+        mlir::Value out2 = mlir::tosa::SelectOp::create(rewriter, loc, resultType, ltMask, negInfTensor, out1);
+
+        rewriter.replaceOp(op, out2);
+        return mlir::success();
+    }
+};
+} // namespace
+
+
 
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
@@ -311,6 +394,11 @@ public:
     // Adding addcmulOp to the illegal ops.
     target.addIllegalOp<addcmulOp>();
     patterns.add<convertAddcmulOp>(&getContext());
+
+    // Adding entrOp to the illegal ops.
+    target.addIllegalOp<entrOp>();
+    patterns.add<convertEntrOp>(&getContext());
+
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
       return signalPassFailure();
