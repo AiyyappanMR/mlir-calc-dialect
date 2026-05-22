@@ -2,6 +2,7 @@
 #include "calc/calcOps.h"
 #include "calc/calcPasses.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
@@ -358,7 +359,91 @@ class convertEntrOp : public mlir::OpRewritePattern<calc::entrOp> {
 };
 } // namespace
 
+namespace {
+class convertProdOp : public mlir::OpRewritePattern<calc::prodOp> {
+    using mlir::OpRewritePattern<calc::prodOp>::OpRewritePattern;
+    mlir::LogicalResult matchAndRewrite(calc::prodOp op, mlir::PatternRewriter &rewriter) const override {
 
+        mlir::Location loc = op.getLoc();
+
+        // Get the input tensor operand 
+        mlir::Value input = op.getInput();
+        mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
+        mlir::Type elemType = inputType.getElementType();
+
+        // Get the Attributes
+        mlir::Attribute dimAttr = op.getDimAttr();
+        mlir::Attribute keepdimAttr = op.getKeepdimAttr();
+
+        // Get the result type and rank
+        mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult().getType()); 
+        int64_t resultRank = resultType.getRank();
+
+        // If the input is scalar return the input itself 
+        if (inputType.getRank() == 0) {
+            rewriter.replaceOp(op, input);
+            return mlir::success();
+        }
+
+        // If dim is specified
+        if (dimAttr) {
+            // Handling dim attribute
+            int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+            if (dimVal < 0) dimVal += inputType.getRank();
+
+            // ReduceProductOp always keeps the axis dim as size 1 (same rank as input).
+            // Build an intermediate type with axis dim = 1, then reshape to the final resultType.
+            auto interShape = inputType.getShape().vec();
+            interShape[dimVal] = 1;
+            mlir::RankedTensorType intermediateTy = mlir::RankedTensorType::get(interShape, elemType);
+
+            // if keepdim=true, we can directly reduce to the resultType since ReduceProductOp will keep the dim with size 1.
+            if (keepdimAttr && llvm::cast<mlir::BoolAttr>(keepdimAttr).getValue()) {
+                mlir::Value result = mlir::tosa::ReduceProductOp::create(rewriter, loc, resultType, input, rewriter.getI32IntegerAttr(dimVal));
+                rewriter.replaceOp(op, result);
+                return mlir::success();
+            } 
+
+            else {
+                // keepdim=false (explicit or default): reduce to intermediateTy, then reshape to resultType which has the axis dim removed.
+                auto shapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), resultRank);
+                auto shapeAttr = rewriter.getIndexTensorAttr(resultType.getShape());
+                mlir::Value shapeConst = mlir::tosa::ConstShapeOp::create(rewriter, loc, shapeTy, shapeAttr);
+                mlir::Value out1 = mlir::tosa::ReduceProductOp::create(rewriter, loc, intermediateTy, input, rewriter.getI32IntegerAttr(dimVal));
+                mlir::Value result = mlir::tosa::ReshapeOp::create(rewriter, loc, resultType, out1, shapeConst);
+                rewriter.replaceOp(op, result);
+                return mlir::success();
+            }
+        } else {
+            // No dim: flatten to 1D, reduce → tensor<1xT>, then extract element and wrap as tensor<T>.
+            int64_t inputElementCount = inputType.getNumElements();
+            
+            // create intermediate types for flattening and reduction
+            mlir::RankedTensorType flatTy = mlir::RankedTensorType::get({inputElementCount}, elemType);
+            mlir::RankedTensorType reduced1Ty = mlir::RankedTensorType::get({1}, elemType);
+            auto shapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), 1);
+            auto shapeAttr = rewriter.getIndexTensorAttr(flatTy.getShape());
+
+            // reshape the input tensor to 1D 
+            mlir::Value shapeConst = mlir::tosa::ConstShapeOp::create(rewriter, loc, shapeTy, shapeAttr);
+            mlir::Value reshapedInput = mlir::tosa::ReshapeOp::create(rewriter, loc, flatTy, input, shapeConst);
+
+            // reduce the flattened tensor 
+            mlir::Value reduced1 = mlir::tosa::ReduceProductOp::create(rewriter, loc, reduced1Ty, reshapedInput, rewriter.getI32IntegerAttr(0));
+
+            // create a scalar tensor from the reduced result 
+            mlir::Value idx0 = mlir::arith::ConstantIndexOp::create(rewriter, loc, 0);
+            mlir::Value scalar = mlir::tensor::ExtractOp::create(rewriter, loc, elemType, reduced1, mlir::ValueRange{idx0});
+            mlir::Value result = mlir::tensor::FromElementsOp::create(rewriter, loc, resultType, mlir::ValueRange{scalar});
+
+            // replace the original op with the final result
+            rewriter.replaceOp(op, result);
+            return mlir::success();
+        }
+
+    }
+};
+} // namespace
 
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
@@ -367,13 +452,14 @@ public:
     registry.insert<mlir::tosa::TosaDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
   }
 
   void runOnOperation() final {
     mlir::ConversionTarget target(getContext());
     mlir::RewritePatternSet patterns(&getContext());
     target.addLegalDialect<mlir::func::FuncDialect, mlir::tosa::TosaDialect,
-                           mlir::tensor::TensorDialect>();
+                           mlir::tensor::TensorDialect, mlir::arith::ArithDialect>();
     target.addIllegalOp<addOp>();
     patterns.add<convertElemWiseOp<addOp, mlir::tosa::AddOp>>(&getContext());
     target.addIllegalOp<mulOp>();
@@ -398,6 +484,10 @@ public:
     // Adding entrOp to the illegal ops.
     target.addIllegalOp<entrOp>();
     patterns.add<convertEntrOp>(&getContext());
+
+    // Adding prodOp to the illegal ops.
+    target.addIllegalOp<prodOp>();
+    patterns.add<convertProdOp>(&getContext());
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))

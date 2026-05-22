@@ -49,6 +49,103 @@ struct FuseAddMul : public OpRewritePattern<calc::addtOp> {
     }
 };
 */
+static mlir::LogicalResult verifyResultShape(mlir::ShapedType inputType, mlir::ShapedType resultType, mlir::Attribute dimAttr, mlir::Attribute keepdimAttr) {
+    // If dim is not specified, the result should be a scalar (rank 0 tensor).
+    if (!dimAttr) {
+        if (resultType.getRank() != 0) {
+            return mlir::failure();
+        }
+        return mlir::success();
+    }
+
+    // If dim is specified, check the consistency of the result shape with the input shape, dim and keepdim attributes.
+    int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+    int64_t inputRank = inputType.getRank();
+    
+    // Handle negative dim value by converting it to the corresponding positive value.
+    if (dimVal < 0) {
+        dimVal += inputRank;
+    }
+    // get input and result shapes
+    auto inputShape = inputType.getShape();
+    auto resultShape = resultType.getShape();
+
+    // if keepdim is present and true
+    if (keepdimAttr && llvm::cast<mlir::BoolAttr>(keepdimAttr).getValue()) {
+        // output rank should be the same as input rank
+        if (resultType.getRank() != inputRank) {
+            return mlir::failure();
+        }
+
+        // all dimensions except the dim should have the same size as input
+        for (int64_t i = 0; i < inputRank; i++) {
+            if (i == dimVal) {
+                if (resultShape[i] != 1) {
+                    return mlir::failure();
+                }
+            }
+            else {
+                if (resultShape[i] != inputShape[i]) {
+                    return mlir::failure();
+                }
+            }
+        }
+    }
+    else{
+        // keepdim is false 
+        // output rank should be input rank - 1
+        if (resultType.getRank() != inputRank - 1) {
+            return mlir::failure();
+        }
+
+        // all dimensions before dim should have the same size as input, and all dimensions after dim should have the same size 
+        // as input but shifted by one position in the result.
+        for (int64_t i = 0; i < inputRank; i++) {
+            if (i < dimVal) {
+                if (resultShape[i] != inputShape[i]) {
+                    return mlir::failure();
+                }
+            }
+            else if (i > dimVal) {
+                if (resultShape[i - 1] != inputShape[i]) {
+                    return mlir::failure();
+                }
+            }
+        }
+    }
+
+    return mlir::success();
+}
+
+// calc.prod Op's Verifier method
+mlir::LogicalResult calc::prodOp::verify() {
+    
+    //get attributes
+    mlir::Attribute dim = getDimAttr();
+    mlir::Attribute keepdim = getKeepdimAttr();
+
+    // Check 1: keepdim without dim
+    if (!dim && keepdim)
+        return emitOpError("keepdim cannot be used without dim");
+
+    // Check 2: dim range check
+    if (dim) {
+        mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(getInput().getType());
+        int64_t rank = inputType.getRank();
+        int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dim).getValue().getSExtValue();
+
+        if (dimVal < -rank || dimVal >= rank)
+            return emitOpError("dim must be in range [-rank, rank-1]");
+    }
+
+    // Check 3: result shape verification based on input shape, dim and keepdim attributes.
+    if (verifyResultShape(llvm::cast<mlir::ShapedType>(getInput().getType()), llvm::cast<mlir::ShapedType>(getResult().getType()), dim, keepdim).failed()){
+        return emitOpError("result shape is not consistent with input shape, dim and keepdim attributes");
+    }
+        
+
+    return mlir::success();
+}
 
 // Canonicalization pattern to fuse addt and mult into addcmul.
 void calc::addtOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
