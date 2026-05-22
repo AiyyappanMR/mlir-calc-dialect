@@ -95,6 +95,19 @@ def calc_minimumOp : calc_Op<"minimum", [Pure, Commutative, SameOperandsAndResul
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
+def calc_entrOp : calc_Op<"entr", [Pure]> {
+    let summary = "Computes the element-wise entropy of a tensor";
+    let description = [{
+    Computes the element-wise entropy of a tensor, defined as -x * log(x) for x > 0, 0 for x == 0, and -inf for x < 0.
+    '''
+    Output = calc.entr([0.5, -1.0, 0]) = [0.34657359, -inf, 0.0]
+    '''
+    }];
+    let arguments = (ins RankedTensorOf<[F32, F64, I32, I64]>:$input);
+    let results = (outs RankedTensorOf<[F32, F64]>:$result);
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+}
+
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Multiply two values";
     let description = [{
