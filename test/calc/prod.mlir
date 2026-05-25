@@ -149,3 +149,101 @@ func.func @test_2d_f32_neg_dim0_keepdim(%arg0: tensor<2x2xf32>) -> tensor<1x2xf3
     %0 = calc.prod %arg0 {dim = -2 : si32, keepdim = true} : (tensor<2x2xf32>) -> tensor<1x2xf32>
     return %0 : tensor<1x2xf32>
 }
+
+// Test 13: 4D i64 no dim
+// CHECK-LABEL: func.func @test_4d_i64_nodim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x3x2x4xi64>) -> tensor<i64>
+func.func @test_4d_i64_nodim(%arg0: tensor<4x3x2x4xi64>) -> tensor<i64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<96> : tensor<1xindex>} : () -> !tosa.shape<1>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[ARG0]], [[SHAPE]] : (tensor<4x3x2x4xi64>, !tosa.shape<1>) -> tensor<96xi64>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[RESHAPE]] {axis = 0 : i32} : (tensor<96xi64>) -> tensor<1xi64>
+    // CHECK-DAG: [[C0:%.+]] = arith.constant 0 : index
+    // CHECK-DAG: [[EXTRACT:%.+]] = tensor.extract [[REDUCE]][[[C0]]] : tensor<1xi64>
+    // CHECK-DAG: [[FROM:%.+]] = tensor.from_elements [[EXTRACT]] : tensor<i64>
+    // CHECK-NEXT: return [[FROM]] : tensor<i64>
+    %0 = calc.prod %arg0 : (tensor<4x3x2x4xi64>) -> tensor<i64>
+    return %0 : tensor<i64>
+}
+
+// Test 14: 5D i64 no dim
+// CHECK-LABEL: func.func @test_5d_i64_nodim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<5x4x3x2x4xi64>) -> tensor<i64>
+func.func @test_5d_i64_nodim(%arg0: tensor<5x4x3x2x4xi64>) -> tensor<i64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<480> : tensor<1xindex>} : () -> !tosa.shape<1>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[ARG0]], [[SHAPE]] : (tensor<5x4x3x2x4xi64>, !tosa.shape<1>) -> tensor<480xi64>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[RESHAPE]] {axis = 0 : i32} : (tensor<480xi64>) -> tensor<1xi64>
+    // CHECK-DAG: [[C0:%.+]] = arith.constant 0 : index
+    // CHECK-DAG: [[EXTRACT:%.+]] = tensor.extract [[REDUCE]][[[C0]]] : tensor<1xi64>
+    // CHECK-DAG: [[FROM:%.+]] = tensor.from_elements [[EXTRACT]] : tensor<i64>
+    // CHECK-NEXT: return [[FROM]] : tensor<i64>
+    %0 = calc.prod %arg0 : (tensor<5x4x3x2x4xi64>) -> tensor<i64>
+    return %0 : tensor<i64>
+}
+
+// Test 15: 4D i64 dim=3 no keepdim
+// CHECK-LABEL: func.func @test_4d_i64_dim3_nokeepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x3x2x4xi64>) -> tensor<4x3x2xi64>
+func.func @test_4d_i64_dim3_nokeepdim(%arg0: tensor<4x3x2x4xi64>) -> tensor<4x3x2xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<[4, 3, 2]> : tensor<3xindex>} : () -> !tosa.shape<3>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 3 : i32} : (tensor<4x3x2x4xi64>) -> tensor<4x3x2x1xi64>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[REDUCE]], [[SHAPE]] : (tensor<4x3x2x1xi64>, !tosa.shape<3>) -> tensor<4x3x2xi64>
+    // CHECK-NEXT: return [[RESHAPE]] : tensor<4x3x2xi64>
+    %0 = calc.prod %arg0 {dim = 3 : si32} : (tensor<4x3x2x4xi64>) -> tensor<4x3x2xi64>
+    return %0 : tensor<4x3x2xi64>
+}
+
+// Test 16: 5D i64 dim=1 no keepdim
+// CHECK-LABEL: func.func @test_5d_i64_dim1_nokeepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<5x4x3x2x4xi64>) -> tensor<5x3x2x4xi64>
+func.func @test_5d_i64_dim1_nokeepdim(%arg0: tensor<5x4x3x2x4xi64>) -> tensor<5x3x2x4xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<[5, 3, 2, 4]> : tensor<4xindex>} : () -> !tosa.shape<4>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 1 : i32} : (tensor<5x4x3x2x4xi64>) -> tensor<5x1x3x2x4xi64>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[REDUCE]], [[SHAPE]] : (tensor<5x1x3x2x4xi64>, !tosa.shape<4>) -> tensor<5x3x2x4xi64>
+    // CHECK-NEXT: return [[RESHAPE]] : tensor<5x3x2x4xi64>
+    %0 = calc.prod %arg0 {dim = 1 : si32} : (tensor<5x4x3x2x4xi64>) -> tensor<5x3x2x4xi64>
+    return %0 : tensor<5x3x2x4xi64>
+}
+
+// Test 17: 4D i64 dim=3 keepdim
+// CHECK-LABEL: func.func @test_4d_i64_dim3_keepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x3x2x4xi64>) -> tensor<4x3x2x1xi64>
+func.func @test_4d_i64_dim3_keepdim(%arg0: tensor<4x3x2x4xi64>) -> tensor<4x3x2x1xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 3 : i32} : (tensor<4x3x2x4xi64>) -> tensor<4x3x2x1xi64>
+    // CHECK-NEXT: return [[REDUCE]] : tensor<4x3x2x1xi64>
+    %0 = calc.prod %arg0 {dim = 3 : si32, keepdim = true} : (tensor<4x3x2x4xi64>) -> tensor<4x3x2x1xi64>
+    return %0 : tensor<4x3x2x1xi64>
+}
+
+// Test 18: 5D i64 dim=1 keepdim
+// CHECK-LABEL: func.func @test_5d_i64_dim1_keepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<5x4x3x2x4xi64>) -> tensor<5x1x3x2x4xi64>
+func.func @test_5d_i64_dim1_keepdim(%arg0: tensor<5x4x3x2x4xi64>) -> tensor<5x1x3x2x4xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 1 : i32} : (tensor<5x4x3x2x4xi64>) -> tensor<5x1x3x2x4xi64>
+    // CHECK-NEXT: return [[REDUCE]] : tensor<5x1x3x2x4xi64>
+    %0 = calc.prod %arg0 {dim = 1 : si32, keepdim = true} : (tensor<5x4x3x2x4xi64>) -> tensor<5x1x3x2x4xi64>
+    return %0 : tensor<5x1x3x2x4xi64>
+}
+
+// Test 19: 4D i64 neg dim=-3 no keepdim
+// CHECK-LABEL: func.func @test_4d_i64_neg_dim1_nokeepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x3x2x4xi64>) -> tensor<4x2x4xi64>
+func.func @test_4d_i64_neg_dim1_nokeepdim(%arg0: tensor<4x3x2x4xi64>) -> tensor<4x2x4xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<[4, 2, 4]> : tensor<3xindex>} : () -> !tosa.shape<3>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 1 : i32} : (tensor<4x3x2x4xi64>) -> tensor<4x1x2x4xi64>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[REDUCE]], [[SHAPE]] : (tensor<4x1x2x4xi64>, !tosa.shape<3>) -> tensor<4x2x4xi64>
+    // CHECK-NEXT: return [[RESHAPE]] : tensor<4x2x4xi64>
+    %0 = calc.prod %arg0 {dim = -3 : si32} : (tensor<4x3x2x4xi64>) -> tensor<4x2x4xi64>
+    return %0 : tensor<4x2x4xi64>
+}
+
+// Test 20: 5D i64 neg dim=-1 no keepdim
+// CHECK-LABEL: func.func @test_5d_i64_neg_dim4_nokeepdim
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<5x4x3x2x4xi64>) -> tensor<5x4x3x2xi64>
+func.func @test_5d_i64_neg_dim4_nokeepdim(%arg0: tensor<5x4x3x2x4xi64>) -> tensor<5x4x3x2xi64> attributes {llvm.emit_c_interface} {
+    // CHECK-DAG: [[SHAPE:%.+]] = tosa.const_shape {values = dense<[5, 4, 3, 2]> : tensor<4xindex>} : () -> !tosa.shape<4>
+    // CHECK-DAG: [[REDUCE:%.+]] = tosa.reduce_product [[ARG0]] {axis = 4 : i32} : (tensor<5x4x3x2x4xi64>) -> tensor<5x4x3x2x1xi64>
+    // CHECK-DAG: [[RESHAPE:%.+]] = tosa.reshape [[REDUCE]], [[SHAPE]] : (tensor<5x4x3x2x1xi64>, !tosa.shape<4>) -> tensor<5x4x3x2xi64>
+    // CHECK-NEXT: return [[RESHAPE]] : tensor<5x4x3x2xi64>
+    %0 = calc.prod %arg0 {dim = -1 : si32} : (tensor<5x4x3x2x4xi64>) -> tensor<5x4x3x2xi64>
+    return %0 : tensor<5x4x3x2xi64>
+}

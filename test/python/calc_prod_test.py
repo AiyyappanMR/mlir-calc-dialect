@@ -141,6 +141,18 @@ PROD_TEST_CASES = [
         None, False,
         id="2d_i64_nodim",
     ),
+    pytest.param(
+        torch.randint(1,10,(4, 3, 2, 4), dtype=torch.int64),
+        "4x3x2x4xi64", "1xi64",
+        None, False,
+        id="4d_i64_nodim",
+    ),
+    pytest.param(
+        torch.randint(1,10,(5, 4, 3, 2, 4), dtype=torch.int64),
+        "5x4x3x2x4xi64", "1xi64",
+        None, False,
+        id="5d_i64_nodim",
+    ),
     # --- dim specified, keepdim=False: rank decreases by 1 ---
     pytest.param(
         torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=torch.float32),
@@ -159,6 +171,18 @@ PROD_TEST_CASES = [
         "3x4x2xf64", "3x4xf64",
         2, False,
         id="3d_f64_dim2_nokeepdim",
+    ),
+    pytest.param(
+        (torch.randint(1, 10, (4, 3, 2, 4), dtype=torch.int64)),
+        "4x3x2x4xi64", "4x3x2xi64",
+        3, False,
+        id="4d_i64_dim3_nokeepdim",
+    ),
+    pytest.param(
+        (torch.randint(1, 10, (5, 4, 3, 2, 4), dtype=torch.int64)),
+        "5x4x3x2x4xi64", "5x3x2x4xi64",
+        1, False,
+        id="5d_i64_dim1_nokeepdim",
     ),
     # --- dim specified, keepdim=True: axis dim set to 1 ---
     pytest.param(
@@ -179,6 +203,18 @@ PROD_TEST_CASES = [
         2, True,
         id="3d_f64_dim2_keepdim",
     ),
+    pytest.param(
+        (torch.randint(1, 10, (4, 3, 2, 4), dtype=torch.int64)),
+        "4x3x2x4xi64", "4x3x2x1xi64",
+        3, True,
+        id="4d_i64_dim3_keepdim",
+    ),
+    pytest.param(
+        (torch.randint(1, 10, (5, 4, 3, 2, 4), dtype=torch.int64)),
+        "5x4x3x2x4xi64", "5x1x3x2x4xi64",
+        1, True,
+        id="5d_i64_dim1_keepdim",
+    ),
     # --- negative dim ---
     pytest.param(
         torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32),
@@ -191,6 +227,18 @@ PROD_TEST_CASES = [
         "2x2xf32", "1x2xf32",
         -2, True,
         id="2d_f32_neg_dim0_keepdim",
+    ),
+    pytest.param(
+        (torch.randint(1, 10, (4, 3, 2, 4), dtype=torch.int64)),
+        "4x3x2x4xi64", "4x2x4xi64",
+        -3, False,
+        id="4d_i64_neg_dim1_nokeepdim",
+    ),
+    pytest.param(
+        (torch.randint(1, 10, (5, 4, 3, 2, 4), dtype=torch.int64)),
+        "5x4x3x2x4xi64", "5x4x3x2xi64",
+        -1, False,
+        id="5d_i64_neg_dim4_nokeepdim",
     ),
 ]
 
