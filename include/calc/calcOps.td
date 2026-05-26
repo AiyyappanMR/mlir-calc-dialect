@@ -127,6 +127,23 @@ def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";   
 }
 
+def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank]> {
+    let summary = "Computes the softmax of the input tensor along the specified dimension";
+    let description = [{
+    Computes the softmax of the input tensor along the specified dimension.
+
+    The softmax function is defined as:
+    softmax(x_i) = exp(x_i) / sum(exp(x_j)) for all j
+
+    If `dim` (i32) is specified, softmax is computed along that axis.
+    Negative `dim` indexing is supported. Dim must be present and valid. 
+    }];
+    let arguments = (ins RankedTensorOf<[F32, F64]>:$input, SI32Attr:$dim);
+    let results = (outs RankedTensorOf<[F32, F64]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
+}
+
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Multiply two values";
     let description = [{

@@ -147,6 +147,22 @@ mlir::LogicalResult calc::prodOp::verify() {
     return mlir::success();
 }
 
+mlir::LogicalResult calc::softmaxOp::verify() {
+    
+    // Get input rank and dim attribute value
+    mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(getInput().getType());
+    int64_t rank = inputType.getRank();
+
+    mlir::Attribute dim = getDimAttr();
+    int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dim).getValue().getSExtValue();
+
+    // Check 1: dim range check
+     if (dimVal < -rank || dimVal >= rank){
+            return emitOpError("dim must be in range [-rank, rank-1]");
+    }
+    return mlir::success();
+}
+
 // Canonicalization pattern to fuse addt and mult into addcmul.
 void calc::addtOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
   // results.add<FuseAddMul>(context);
