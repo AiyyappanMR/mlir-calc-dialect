@@ -15,7 +15,7 @@ import calc_mlir
 from calc_mlir.ir import Context, Module
 from calc_mlir.passmanager import PassManager
 from calc_mlir.execution_engine import ExecutionEngine
-from calc_mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
+from calc_mlir.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy, make_zero_d_memref_descriptor
 from calc_mlir._mlir_libs._calcMlir import register_dialect
 
 #---------------------------------------------------------------------------------
@@ -89,26 +89,43 @@ def run_prod(input_tensor, in_type, out_type, dim=None, keepdim=False):
 
     calc_ir = build_ir(in_type, out_type, dim, keepdim)
     np_input = input_tensor.numpy().astype(np_dtype)
-    result = np.zeros(out_shape, dtype=np_dtype)
 
     with Context() as ctx:
         register_dialect(ctx)
         print(calc_ir) 
         module = Module.parse(calc_ir)
-        execution_engine = ExecutionEngine(
-            CalcToLLVM(module),
-            shared_libs=["/home/mcw/llvm-project/build/lib/libmlir_c_runner_utils.so"],
-        )
+
+        # Required for tests involving multi-dim tensors with no dim attr
+        # export MLIR_C_RUNNER_UTILS=/path/to/llvm-project/build/lib/libmlir_c_runner_utils.so
+        runner_utils_lib = os.environ.get("MLIR_C_RUNNER_UTILS")
+        print(runner_utils_lib)
+        if runner_utils_lib:
+            execution_engine = ExecutionEngine(
+                CalcToLLVM(module),
+                shared_libs=[runner_utils_lib],
+            )
+        else:
+            execution_engine = ExecutionEngine(CalcToLLVM(module))
 
         mem_input = get_ranked_memref_descriptor(np_input)
-        mem_result = get_ranked_memref_descriptor(result)
 
         final_input = ctypes.pointer(ctypes.pointer(mem_input))
-        final_result = ctypes.pointer(ctypes.pointer(mem_result))
 
-        # result goes first — tensor return ABI convention for emit_c_interface
-        execution_engine.invoke("test_prod", final_result, final_input)
-        return ranked_memref_to_numpy(ctypes.pointer(mem_result))
+        if dim is None:
+            # rank-0 result using make_zero_d_memref_descriptor with rank=0
+            Num_Cty = {"f32": ctypes.c_float, "f64": ctypes.c_double, "i32": ctypes.c_int32, "i64": ctypes.c_int64,}
+            ctype_dtype = Num_Cty[elem_type]
+            ZeroDDescriptor = make_zero_d_memref_descriptor(ctype_dtype)
+            mem_result = ZeroDDescriptor()
+            final_result = ctypes.pointer(ctypes.pointer(mem_result))
+            execution_engine.invoke("test_prod", final_result, final_input)
+            return np.array(mem_result.aligned[0], dtype=np_dtype)
+        else:
+            result = np.zeros(out_shape, dtype=np_dtype)
+            mem_result = get_ranked_memref_descriptor(result)
+            final_result = ctypes.pointer(ctypes.pointer(mem_result))
+            execution_engine.invoke("test_prod", final_result, final_input)
+            return ranked_memref_to_numpy(ctypes.pointer(mem_result))
 
 
 #---------------------------------------------------------------------------------
@@ -116,40 +133,40 @@ def run_prod(input_tensor, in_type, out_type, dim=None, keepdim=False):
 #---------------------------------------------------------------------------------
 
 PROD_TEST_CASES = [
-    # --- no dim: product of all elements → rank-0 result (wrapped as tensor<1xT>) ---
+    # --- no dim: product of all elements → rank-0 result (tensor<T>) ---
     pytest.param(
         torch.tensor([1.0, 2.0, 3.0, 4.0], dtype=torch.float32),
-        "4xf32", "1xf32",
+        "4xf32", "f32",
         None, False,
         id="1d_f32_nodim",
     ),
     pytest.param(
         torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64),
-        "2x2xf64", "1xf64",
+        "2x2xf64", "f64",
         None, False,
         id="2d_f64_nodim",
     ),
     pytest.param(
         torch.tensor([1, 2, 3, 4], dtype=torch.int32),
-        "4xi32", "1xi32",
+        "4xi32", "i32",
         None, False,
         id="1d_i32_nodim",
     ),
     pytest.param(
         torch.tensor([[3, 2, 4], [5, 6, 7]], dtype=torch.int64),
-        "2x3xi64", "1xi64",
+        "2x3xi64", "i64",
         None, False,
         id="2d_i64_nodim",
     ),
     pytest.param(
         torch.randint(1,10,(4, 3, 2, 4), dtype=torch.int64),
-        "4x3x2x4xi64", "1xi64",
+        "4x3x2x4xi64", "i64",
         None, False,
         id="4d_i64_nodim",
     ),
     pytest.param(
         torch.randint(1,10,(5, 4, 3, 2, 4), dtype=torch.int64),
-        "5x4x3x2x4xi64", "1xi64",
+        "5x4x3x2x4xi64", "i64",
         None, False,
         id="5d_i64_nodim",
     ),
@@ -251,7 +268,7 @@ def test_prod(input_tensor, in_type, out_type, dim, keepdim):
 
     if dim is None:
         expected_scalar = torch.prod(input_tensor).item()
-        expected = np.array([expected_scalar], dtype=Num_Dty[elem_type])
+        expected = np.array(expected_scalar, dtype=Num_Dty[elem_type])
     else:
         expected = torch.prod(input_tensor, dim=dim, keepdim=keepdim).numpy()
 

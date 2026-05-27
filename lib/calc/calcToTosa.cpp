@@ -415,6 +415,13 @@ class convertProdOp : public mlir::OpRewritePattern<calc::prodOp> {
                 return mlir::success();
             }
         } else {
+
+            // This lowering requires a compile-time element count in order to build the
+            // intermediate flattened tensor type and reshape shape constant.
+            if (!inputType.hasStaticShape()) {
+                return rewriter.notifyMatchFailure(op,"calc.prod without dim requires a statically-shaped tensor input");
+                    }
+
             // No dim: flatten to 1D, reduce → tensor<1xT>, then extract element and wrap as tensor<T>.
             int64_t inputElementCount = inputType.getNumElements();
             
