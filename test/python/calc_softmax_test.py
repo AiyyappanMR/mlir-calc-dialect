@@ -140,15 +140,21 @@ SOFTMAX_TEST_CASES = [
         "2x8x16x16xf64",
         3,
     ),
+    (
+        torch.tensor([[80.0, -80.0, 80.0], [-80.0, 80.0, -80.0]], dtype=torch.float32),
+        "2x3xf32",
+        1,
+    ),
+    (
+        torch.tensor([[700.0, -700.0, 700.0], [-700.0, 700.0, -700.0]], dtype=torch.float64),
+        "2x3xf64",
+        1,
+    ),
 ]
 
 
 @pytest.mark.parametrize("input_tensor, tensor_type, dim", SOFTMAX_TEST_CASES)
 def test_softmax(input_tensor, tensor_type, dim):
-
-    # print the input tensor
-    print(f"\n input: {input_tensor}")
-    print(f" tensor_type: {tensor_type}, dim: {dim}")
 
     # actual and expected outputs
     actual = run_softmax(input_tensor, tensor_type, dim)

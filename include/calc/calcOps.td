@@ -127,7 +127,7 @@ def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";   
 }
 
-def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank]> {
+def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultType]> {
     let summary = "Computes the softmax of the input tensor along the specified dimension";
     let description = [{
     Computes the softmax of the input tensor along the specified dimension.

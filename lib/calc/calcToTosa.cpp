@@ -460,17 +460,22 @@ class convertSoftmaxOp : public mlir::OpRewritePattern<calc::softmaxOp> {
     mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(op.getInput().getType());
     mlir::Attribute dimAttr = op.getDimAttr();
 
-    // Handle negative dim by adding the input rank to it.
     int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
-    if (dimVal < 0) dimVal += inputType.getRank();
 
-    // Compute the exp(input) using tosa::ExpOp
-    mlir::Value expInput = mlir::tosa::ExpOp::create(rewriter, loc, inputType, op.getInput());
+    // normalize negative dim first
+    if (dimVal < 0) dimVal += inputType.getRank();;
+
+    // defensive bounds check
+    if (dimVal < 0 || dimVal >= inputType.getRank())
+        return rewriter.notifyMatchFailure(op, "dim out of range");
 
     // build a new type with dim axis set to 1
     llvm::SmallVector<int64_t> reducedShape(inputType.getShape());
     reducedShape[dimVal] = 1;
     mlir::RankedTensorType reducedType = mlir::RankedTensorType::get(reducedShape, inputType.getElementType());
+
+    // Compute the exp(input) using tosa::ExpOp
+    mlir::Value expInput = mlir::tosa::ExpOp::create(rewriter, loc, inputType, op.getInput());
 
     // Compute the sum of the exponentials along the specified dim using tosa::ReduceSumOp.
     mlir::Value sumExp = mlir::tosa::ReduceSumOp::create(rewriter, loc, reducedType, expInput,
