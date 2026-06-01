@@ -108,6 +108,25 @@ def calc_entrOp : calc_Op<"entr", [Pure]> {
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
+def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
+    let summary = "Computes the product of all elements in the input tensor";
+    let description = [{
+    Computes the product of elements in the input tensor.
+
+    If `dim` (i32) is specified, the product is computed along that axis.
+    If `keepdim` (bool, default: false) is true, the reduced dimension is retained as size 1.
+    If `keepdim` is false, the reduced dimension is removed and rank is reduced by 1.
+    `keepdim` is only valid when `dim` is specified.
+
+    If `dim` is not specified, product of all elements is returned as a scalar.
+    Negative `dim` indexing is supported. Empty tensor returns 1.
+    }];
+    let arguments = (ins RankedTensorOf<[I32, I64, F32, F64]>:$input, OptionalAttr<SI32Attr>:$dim, OptionalAttr<BoolAttr>:$keepdim);
+    let results = (outs RankedTensorOf<[I32, I64, F32, F64]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";   
+}
+
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Multiply two values";
     let description = [{
