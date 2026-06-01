@@ -452,6 +452,60 @@ class convertProdOp : public mlir::OpRewritePattern<calc::prodOp> {
 };
 } // namespace
 
+
+namespace { 
+class convertSoftmaxOp : public mlir::OpRewritePattern<calc::softmaxOp> {
+  using mlir::OpRewritePattern<calc::softmaxOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(calc::softmaxOp op, mlir::PatternRewriter &rewriter) const override {
+
+    // Get location
+    mlir::Location loc = op.getLoc();
+
+    // Get the input operand and attribute
+    mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(op.getInput().getType());
+    mlir::Attribute dimAttr = op.getDimAttr();
+
+    int64_t dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+
+    // normalize negative dim first
+    if (dimVal < 0) dimVal += inputType.getRank();;
+
+    // defensive bounds check
+    if (dimVal < 0 || dimVal >= inputType.getRank())
+        return rewriter.notifyMatchFailure(op, "dim out of range");
+
+    // build a new type with dim axis set to 1
+    llvm::SmallVector<int64_t> reducedShape(inputType.getShape());
+    reducedShape[dimVal] = 1;
+    mlir::RankedTensorType reducedType = mlir::RankedTensorType::get(reducedShape, inputType.getElementType());
+
+    // Compute the exp(input) using tosa::ExpOp
+    mlir::Value expInput = mlir::tosa::ExpOp::create(rewriter, loc, inputType, op.getInput());
+
+    // Compute the sum of the exponentials along the specified dim using tosa::ReduceSumOp.
+    mlir::Value sumExp = mlir::tosa::ReduceSumOp::create(rewriter, loc, reducedType, expInput,
+                            rewriter.getI32IntegerAttr(dimVal));
+
+    // Compute the reciprocal of the Exp sum using tosa::ReciprocalOp
+    mlir::Value reciprocalSum = mlir::tosa::ReciprocalOp::create(rewriter, loc, reducedType, sumExp);
+
+    // Create a constant shift value of 0 for the tosa::MulOp
+    mlir::RankedTensorType shiftType = mlir::RankedTensorType::get({1}, rewriter.getI8Type()); // {1} not {}
+    mlir::DenseElementsAttr shiftAttr = mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+    mlir::Value shift = mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr);
+
+    // Multiply exp(input) with the reciprocal of the sum using tosa::MulOp to get the final softmax result.
+    mlir::Value softmaxResult = mlir::tosa::MulOp::create(rewriter, loc, inputType, expInput, reciprocalSum, shift);
+
+    // Replace the original softmax op with the final result.
+    rewriter.replaceOp(op, softmaxResult);
+    return mlir::success();
+  }
+};
+} // namespace
+
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -495,6 +549,10 @@ public:
     // Adding prodOp to the illegal ops.
     target.addIllegalOp<prodOp>();
     patterns.add<convertProdOp>(&getContext());
+
+    // Adding softmaxOp to the illegal ops.
+    target.addIllegalOp<softmaxOp>();
+    patterns.add<convertSoftmaxOp>(&getContext());
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
