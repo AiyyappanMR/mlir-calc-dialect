@@ -163,6 +163,52 @@ mlir::LogicalResult calc::softmaxOp::verify() {
     return mlir::success();
 }
 
+mlir::LogicalResult calc::stackOp::verify() {
+
+    // Get input rank and dim attribute value
+    mlir::OperandRange inputs = getInputs();
+    if (inputs.empty()){
+        return emitOpError("requires at least one input tensor");
+    }
+    mlir::RankedTensorType firstType = llvm::cast<mlir::RankedTensorType>(inputs[0].getType());
+    int64_t rank = firstType.getRank();
+    int64_t numInputs = inputs.size();
+
+    int64_t dimVal = 0; // default dim value is 0
+
+    // Check 1: dim range check
+    mlir::Attribute dimAttr = getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+        if (dimVal < -(rank + 1) || dimVal > rank){
+            return emitOpError("dim must be in range [-(rank+1), rank]");
+        }
+    }
+
+    // Check 2: all input tensors should have the same shape and type
+    for (mlir::Value input : inputs) {
+        mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
+        if (inputType.getShape() != firstType.getShape() || inputType.getElementType() != firstType.getElementType()) {
+            return emitOpError("all input tensors must have the same shape and type");
+        }
+    }
+
+    if (dimVal < 0) dimVal += rank + 1;
+
+    // Check 3: result shape verification based on input shapes and dim attribute.
+    std::vector<int64_t> expectedShape = firstType.getShape().vec();
+    expectedShape.insert(expectedShape.begin() + dimVal, numInputs);
+
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult().getType());
+    std::vector<int64_t> resultShape = resultType.getShape().vec();
+
+    if (resultShape != expectedShape) {
+        return emitOpError("result shape is not consistent with input shapes and dim attribute");
+    }
+
+    return mlir::success();
+}
+
 // Canonicalization pattern to fuse addt and mult into addcmul.
 void calc::addtOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
   // results.add<FuseAddMul>(context);

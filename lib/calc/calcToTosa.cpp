@@ -506,6 +506,71 @@ class convertSoftmaxOp : public mlir::OpRewritePattern<calc::softmaxOp> {
 };
 } // namespace
 
+namespace { 
+class convertStackOp : public mlir::OpRewritePattern<calc::stackOp> {
+  using mlir::OpRewritePattern<calc::stackOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(calc::stackOp op, mlir::PatternRewriter &rewriter) const override {
+
+    // Get location
+    mlir::Location loc = op.getLoc();
+
+    // Initiaize a dim value to 0 and if the dim attribute is present, update the dim value accordingly.
+    int64_t dimVal = 0;
+    mlir::Attribute dimAttr = op.getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+    }
+
+    // Get the input operands and their types.
+    mlir::OperandRange inputs = op.getInputs();
+    mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(inputs[0].getType());
+    std::vector<int64_t> inputShape = inputType.getShape().vec();
+
+    // Get the result type and rank
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult().getType()); 
+    int64_t resultRank = resultType.getRank();
+
+
+    // normalize negative dim first
+    if (dimVal < 0) dimVal += inputType.getRank()+1;
+
+    // defensive bounds check
+    if (dimVal < 0 || dimVal > inputType.getRank())
+        return rewriter.notifyMatchFailure(op, "dim out of range");
+
+    inputShape.insert(inputShape.begin() + dimVal, 1);
+
+    // Pad the input tensor shapes with 1s at the dim axis so that they can be concatenated together. 
+    // eg: if we have 3 input tensors of shape [2, 3] and dim=1, we will reshape them to [2, 1, 3] 
+    //     and then concatenate along dim=1 to get a final result of shape [2, 3, 3].
+
+    mlir::RankedTensorType reshapeType = mlir::RankedTensorType::get(inputShape, inputType.getElementType());
+    mlir::tosa::shapeType reshapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), resultRank);
+    auto reshapeAttr = rewriter.getIndexTensorAttr(inputShape);
+    mlir::Value shapeConst = mlir::tosa::ConstShapeOp::create(rewriter, loc, reshapeTy, reshapeAttr);
+
+    // Initialize a vector to hold the reshaped input tensors.
+    std::vector<mlir::Value> reshapedInputs;
+    for (mlir::Value input : op.getInputs()) {
+
+        // reshape each input tensor to the new shape with 1 at the dim axis using tosa::ReshapeOp.
+        mlir::Value reshapedInput = mlir::tosa::ReshapeOp::create(rewriter, loc, reshapeType, input, shapeConst);
+        reshapedInputs.push_back(reshapedInput);
+    }
+
+    // Concatenate the reshaped input tensors along the specified dim using tosa::ConcatOp to get the final result.
+    mlir::Value stackResult = mlir::tosa::ConcatOp::create(rewriter, loc, resultType, reshapedInputs, rewriter.getI32IntegerAttr(dimVal));
+
+    
+    // Replace the original stack op with the final result.
+    rewriter.replaceOp(op, stackResult);
+    return mlir::success();
+  }
+};
+} // namespace
+
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -553,6 +618,10 @@ public:
     // Adding softmaxOp to the illegal ops.
     target.addIllegalOp<softmaxOp>();
     patterns.add<convertSoftmaxOp>(&getContext());
+
+    // Adding stackOp to the illegal ops.
+    target.addIllegalOp<stackOp>();
+    patterns.add<convertStackOp>(&getContext());
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))

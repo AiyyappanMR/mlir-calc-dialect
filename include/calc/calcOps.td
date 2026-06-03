@@ -144,6 +144,22 @@ def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultType]> {
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
 }
 
+def calc_stackOp : calc_Op<"stack", [Pure, SameOperandsAndResultElementType]> {
+    let summary = "Stacks a list of tensors along a new dimension";
+    let description = [{
+    Stacks a list of tensors along a new dimension specified by `dim` (i32).
+
+    All input tensors must have the same shape and element type.
+    The output tensor will have one more dimension than the input tensors, with size equal to the number of input tensors along the `dim` axis.
+
+    Negative `dim` indexing is supported. Dim must be present and valid.
+    }];
+    let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs, OptionalAttr<SI32Attr>:$dim);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
+}
+
 def calc_mulOp : calc_Op<"mul", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Multiply two values";
     let description = [{
