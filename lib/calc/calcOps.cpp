@@ -9,8 +9,8 @@ using namespace calc;
 #define GET_OP_CLASSES
 #include "calc/calcOps.cpp.inc"
 
-#define GET_PATTERN_CLASSES
-#include "calc/calcPatterns.cpp.inc" 
+// #define GET_PATTERN_CLASSES
+// #include "calc/calcPatterns.cpp.inc" 
 
 // Pattern to fuse addt and mult into addcmul.
 // %0 = calc.mult %a, %b
@@ -19,8 +19,7 @@ using namespace calc;
 // %1 = calc.addcmul %c, %a, %b
 
 
-// C++ pattern commented out — replaced by DRR pattern in calcPatterns.td
-/*
+
 struct FuseAddMul : public OpRewritePattern<calc::addtOp> {
     using OpRewritePattern::OpRewritePattern;
     LogicalResult matchAndRewrite(calc::addtOp Op, PatternRewriter &rewriter) const override {
@@ -44,11 +43,16 @@ struct FuseAddMul : public OpRewritePattern<calc::addtOp> {
         mlir::Value mulrhs = mul.getOperand(1);
 
         // Replace the addt operation with an addcmul operation.
-        rewriter.replaceOpWithNewOp<calc::addcmulOp>(Op, Op.getType(), lhs, mullhs, mulrhs, mlir::Attribute{});
+
+        //old cpp API for addcmul with Attribute
+        // rewriter.replaceOpWithNewOp<calc::addcmulOp>(Op, Op.getType(), lhs, mullhs, mulrhs, mlir::Attribute{});
+
+        // Here we use the cpp API for addcmul without specifying Attribute.
+        rewriter.replaceOpWithNewOp<calc::addcmulOp>(Op, Op.getType(), lhs, mullhs, mulrhs);
         return success();
     }
 };
-*/
+
 static mlir::LogicalResult verifyResultShape(mlir::ShapedType inputType, mlir::ShapedType resultType, mlir::Attribute dimAttr, mlir::Attribute keepdimAttr) {
     // If dim is not specified, the result should be a scalar (rank 0 tensor).
     if (!dimAttr) {
@@ -165,6 +169,6 @@ mlir::LogicalResult calc::softmaxOp::verify() {
 
 // Canonicalization pattern to fuse addt and mult into addcmul.
 void calc::addtOp::getCanonicalizationPatterns(RewritePatternSet &results, MLIRContext *context) {
-  // results.add<FuseAddMul>(context);
-  populateWithGenerated(results);
+  results.add<FuseAddMul>(context);
+  // populateWithGenerated(results);
 }
