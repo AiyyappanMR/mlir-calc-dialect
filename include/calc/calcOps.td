@@ -67,6 +67,10 @@ def calc_addcmulOp : calc_Op<"addcmul",[Pure, SameOperandsAndResultElementType, 
                         RankedTensorOf<[AnyInteger, AnyFloat]>:$tensor2, OptionalAttr<AnyAttrOf<[F32Attr, F64Attr, I32Attr, I64Attr]>>:$value);
     let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+    let builders = [  
+        OpBuilder<(ins "mlir::Type":$resultType, "mlir::Value":$input, "mlir::Value":$tensor1, "mlir::Value":$tensor2), 
+        [{build($_builder, $_state, resultType, input, tensor1, tensor2, mlir::Attribute{});}]>
+    ];
 }
 
 def calc_logaddexp2Op : calc_Op<"logaddexp2", [Pure, Commutative, SameOperandsAndResultElementType, SameOperandsAndResultRank, ResultsBroadcastableShape]> {
