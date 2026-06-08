@@ -112,6 +112,31 @@ def calc_entrOp : calc_Op<"entr", [Pure]> {
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
+def calc_splitOp : calc_Op<"split", [Pure, SameOperandsAndResultElementType]> {
+    let summary = "Splits a tensor into chunks of specified sizes along a dimension";
+    let description = [{
+        Splits the input tensor into `len(split_sizes)` chunks along `dim`,
+        where each chunk has the size specified by the corresponding entry in
+        `split_sizes`. The sizes must sum exactly to the size of the input
+        tensor along `dim`.
+
+        `dim` defaults to 0 if not specified. Negative `dim` indexing is
+        supported and is normalized as `dim + rank` before use.
+
+        Example:
+          %a, %b = calc.split %input {split_sizes = array<i64: 1, 4>, dim = 0 : si32}
+                   : (tensor<5x4xf32>) -> (tensor<1x4xf32>, tensor<4x4xf32>)
+    }];
+    let arguments = (ins
+        RankedTensorOf<[I32, I64, F32, F64]>:$input,
+        DenseI64ArrayAttr:$split_sizes,
+        OptionalAttr<SI32Attr>:$dim
+    );
+    let results = (outs Variadic<RankedTensorOf<[I32, I64, F32, F64]>>:$results);
+    let hasVerifier = 1;
+    let assemblyFormat = "$input attr-dict `:` functional-type($input, $results)";
+}
+
 def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
     let summary = "Computes the product of all elements in the input tensor";
     let description = [{

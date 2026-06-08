@@ -219,6 +219,61 @@ class convertLogaddexp2Op : public mlir::OpRewritePattern<calc::logaddexp2Op> {
 } // namespace
 
 namespace {
+class convertSplitOp : public mlir::OpRewritePattern<calc::splitOp> {
+    using mlir::OpRewritePattern<calc::splitOp>::OpRewritePattern;
+    mlir::LogicalResult matchAndRewrite(calc::splitOp op, mlir::PatternRewriter &rewriter) const override {
+        mlir::Location loc = op.getLoc();
+        mlir::Value input = op.getInput();
+        mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
+        int64_t rank = inputType.getRank();
+        llvm::ArrayRef<int64_t> inputShape = inputType.getShape();
+
+        if (!inputType.hasStaticShape())
+            return rewriter.notifyMatchFailure(op, "calc.split requires a statically-shaped input");
+
+        llvm::ArrayRef<int64_t> splitSizes = op.getSplitSizes();
+
+        // Resolve dim: default 0, normalize negative.
+        int64_t dimVal = 0;
+        if (mlir::IntegerAttr dimAttr = op.getDimAttr()) {
+            dimVal = dimAttr.getValue().getSExtValue();
+            if (dimVal < 0) dimVal += rank;
+        }
+
+        mlir::tosa::shapeType shapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), rank);
+        llvm::SmallVector<mlir::Value> sliceResults;
+        int64_t offset = 0;
+
+        for (size_t i = 0; i < splitSizes.size(); ++i) {
+            int64_t chunkSize = splitSizes[i];
+
+            // start[dimVal] = running offset; all other dims start at 0.
+            llvm::SmallVector<int64_t> startValues(rank, 0);
+            startValues[dimVal] = offset;
+            mlir::Value startShape = mlir::tosa::ConstShapeOp::create(rewriter, loc, shapeTy,
+                rewriter.getIndexTensorAttr(llvm::ArrayRef<int64_t>(startValues)));
+
+            // size[dimVal] = this chunk's size; all other dims retain the full input size.
+            llvm::SmallVector<int64_t> sizeValues(inputShape.begin(), inputShape.end());
+            sizeValues[dimVal] = chunkSize;
+            mlir::Value sizeShape = mlir::tosa::ConstShapeOp::create(rewriter, loc, shapeTy,
+                rewriter.getIndexTensorAttr(llvm::ArrayRef<int64_t>(sizeValues)));
+
+            mlir::RankedTensorType sliceResultType = llvm::cast<mlir::RankedTensorType>(op.getResults()[i].getType());
+
+            mlir::Value slice = mlir::tosa::SliceOp::create(rewriter, loc, sliceResultType, input, startShape, sizeShape);
+
+            sliceResults.push_back(slice);
+            offset += chunkSize;
+        }
+
+        rewriter.replaceOp(op, sliceResults);
+        return mlir::success();
+    }
+};
+} // namespace
+
+namespace {
 class convertMinimumOp : public mlir::OpRewritePattern<calc::minimumOp> {
     using mlir::OpRewritePattern<calc::minimumOp>::OpRewritePattern;
     mlir::LogicalResult matchAndRewrite(calc::minimumOp op, mlir::PatternRewriter &rewriter) const override {
@@ -533,6 +588,10 @@ public:
     // Adding logaddexp2Op to the illegal ops.
     target.addIllegalOp<logaddexp2Op>();
     patterns.add<convertLogaddexp2Op>(&getContext());
+
+    // Adding splitOp to the illegal ops.
+    target.addIllegalOp<splitOp>();
+    patterns.add<convertSplitOp>(&getContext());
 
     // Adding minimumOp to the illegal ops.
     target.addIllegalOp<minimumOp>();

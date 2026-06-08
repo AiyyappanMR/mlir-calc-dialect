@@ -151,6 +151,73 @@ mlir::LogicalResult calc::prodOp::verify() {
     return mlir::success();
 }
 
+mlir::LogicalResult calc::splitOp::verify() {
+    auto inputType = mlir::cast<mlir::RankedTensorType>(getInput().getType());
+    auto rank = inputType.getRank();
+    auto splitSizes = getSplitSizes();
+    if (splitSizes.empty()) {
+        return emitOpError("split sizes cannot be empty");
+    }
+    auto results = getResults();
+
+    // Check 1: Input mustn't be rank 0
+    if (rank == 0) {
+        return emitOpError("input must be rank 1 or higher");
+    }
+
+    // Check 2: Dim attribute must be in range 
+    int64_t dimVal = 0;
+    if (getDimAttr()) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(getDimAttr()).getValue().getSExtValue();
+        if (dimVal < -rank || dimVal >= rank) {
+            return emitOpError("dim must be in range [-rank, rank-1]");
+        }
+    }
+    // Handle negative dim value by converting it to the corresponding positive value.
+    if (dimVal < 0) dimVal += rank;
+
+    // Check 3: The number of split sizes must match the number of results.
+    if (splitSizes.size() != results.size()) {
+        return emitOpError("the number of split sizes must match the number of results");
+    }
+
+    // Check 4: The sum of split sizes must match the size of the input along the specified dimension.
+    int64_t totalSplitSize = 0;
+    for (int64_t sizeAttr : splitSizes) {
+        if (sizeAttr <= 0) {
+            return emitOpError("split sizes must be positive integers");
+        }
+        int64_t size = sizeAttr;
+        totalSplitSize += size;
+    }
+    if (totalSplitSize != inputType.getDimSize(dimVal)) {
+        return emitOpError("the sum of split sizes must match the size of the input along the specified dimension");
+    }
+
+    // Check 5: Each result type must be a ranked tensor and its shape must be consistent with the corresponding split size.
+    for (size_t i = 0; i < results.size(); ++i) {
+        auto resultType = mlir::cast<mlir::RankedTensorType>(results[i].getType());
+        auto resultShape = resultType.getShape();
+        if (resultShape.size() != rank) {
+            return emitOpError("each result must have the same rank as the input");
+        }
+        for (int64_t j = 0; j < resultShape.size(); ++j) {
+            if (j == dimVal) {
+                if (resultShape[j] != splitSizes[i]) {
+                    return emitOpError("the size of the result along the split dimension must match the corresponding split size");
+                }
+            } else {
+                if (resultShape[j] != inputType.getDimSize(j)) {
+                    return emitOpError("the size of the result along non-split dimensions must match the input");
+                }
+            }
+        }
+    }
+
+
+    return mlir::success();
+}
+
 mlir::LogicalResult calc::softmaxOp::verify() {
     
     // Get input rank and dim attribute value
