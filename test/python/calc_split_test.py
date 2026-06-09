@@ -114,6 +114,8 @@ def run_split(input_tensor, in_type, out_types, split_sizes, dim=None):
             memrefs.append(get_ranked_memref_descriptor(res_np))
             
         # Dynamically create the result struct type based on outputs
+        # refer to https://discourse.llvm.org/t/runjit-a-model-with-multiple-results/60402 for how to return 
+        # multiple memrefs from the execution engine
         class ResultStruct(ctypes.Structure):
             _fields_ = [(f"res{i}", type(memrefs[i])) for i in range(len(memrefs))]
             
