@@ -215,6 +215,18 @@ SPLIT_TEST_CASES = [
         [2, 4], None,
         id="3d_f32_nodim",
     ),
+    pytest.param(
+         torch.randint(0, 10, (5,), dtype=torch.int32),
+         "5xi32", ["1xi32", "4xi32"],
+         [1, 4], None,
+         id="1d_i32_unequal_nodim",
+     ),
+     pytest.param(
+         torch.randint(0, 10, (4,), dtype=torch.int64),
+         "4xi64", ["2xi64", "2xi64"],
+         [2, 2], None,
+         id="1d_i64_equal_nodim",
+     ),
 ]
 
 

@@ -181,16 +181,17 @@ mlir::LogicalResult calc::splitOp::verify() {
         return emitOpError("the number of split sizes must match the number of results");
     }
 
-    // Check 4: The sum of split sizes must match the size of the input along the specified dimension.
+    // Check 4: The sum of split sizes must match the size of the input along the specified dimension
+    // when that dimension is statically known.
     int64_t totalSplitSize = 0;
     for (int64_t sizeAttr : splitSizes) {
         if (sizeAttr <= 0) {
             return emitOpError("split sizes must be positive integers");
         }
-        int64_t size = sizeAttr;
-        totalSplitSize += size;
+        totalSplitSize += sizeAttr;
     }
-    if (totalSplitSize != inputType.getDimSize(dimVal)) {
+    int64_t dimSize = inputType.getDimSize(dimVal);
+    if (dimSize != mlir::ShapedType::kDynamic && totalSplitSize != dimSize) {
         return emitOpError("the sum of split sizes must match the size of the input along the specified dimension");
     }
 

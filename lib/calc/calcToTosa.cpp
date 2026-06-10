@@ -240,8 +240,18 @@ class convertSplitOp : public mlir::OpRewritePattern<calc::splitOp> {
             if (dimVal < 0) dimVal += rank;
         }
 
+        // Defensive bounds / consistency checks 
+        if (rank <= 0)
+            return rewriter.notifyMatchFailure(op, "calc.split requires rank > 0");
+        if (dimVal < 0 || dimVal >= rank)
+            return rewriter.notifyMatchFailure(op, "dim out of range");
+        if (splitSizes.size() != op.getResults().size())
+            return rewriter.notifyMatchFailure(op, "split_sizes/result count mismatch");
+
+
         mlir::tosa::shapeType shapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), rank);
         llvm::SmallVector<mlir::Value> sliceResults;
+        sliceResults.reserve(splitSizes.size());
         int64_t offset = 0;
 
         for (size_t i = 0; i < splitSizes.size(); ++i) {
