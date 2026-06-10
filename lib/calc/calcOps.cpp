@@ -158,7 +158,12 @@ mlir::LogicalResult calc::catmuladdOp::verify() {
     mlir::OperandRange inputs2 = getInputs2();
     mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult().getType());
     int64_t resultRank = resultType.getRank();
-    std::vector<int64_t> resultShape = resultType.getShape().vec(); // get result shape as vector
+    
+    // Check: result must have rank >= 1 since we are concatenating along a dimension. If result is rank 0, it cannot have any dimensions to concatenate along.
+    if (resultRank == 0)
+        return emitOpError("requires rank >= 1 (cannot concatenate rank-0 tensors)");
+    
+        std::vector<int64_t> resultShape = resultType.getShape().vec(); // get result shape as vector
 
     // Check 0: each group must have at least one operand.
     if (inputs1.empty() || inputs2.empty())
@@ -189,8 +194,11 @@ mlir::LogicalResult calc::catmuladdOp::verify() {
             return emitOpError("all operands in inputs1 must have the same rank as the result");
         for (int64_t i = 0; i < (int64_t)operandShape.size(); i++) {
             // For the concat dimension, we accumulate the size to compare with the result shape later.
-            if (i == dimVal)
+            if (i == dimVal) {
+                if (operandType.isDynamicDim(dimVal))
+                    return emitOpError("requires static operand sizes along the concat dimension");
                 input1DimSize += operandShape[i];
+            }
             // For non-concat dimensions, the operand shape must match the result shape.
             else if (operandShape[i] != resultShape[i])
                 return emitOpError("operands in inputs1 must match the result shape on all non-concat dimensions");
@@ -210,8 +218,11 @@ mlir::LogicalResult calc::catmuladdOp::verify() {
             return emitOpError("all operands in inputs2 must have the same rank as the result");
         for (int64_t i = 0; i < (int64_t)operandShape.size(); i++) {
             // For the concat dimension, we accumulate the size to compare with the result shape later.
-            if (i == dimVal)
+            if (i == dimVal) {
+                if (operandType.isDynamicDim(dimVal))
+                    return emitOpError("requires static operand sizes along the concat dimension");
                 input2DimSize += operandShape[i];
+            }
             // For non-concat dimensions, the operand shape must match the result shape.
             else if (operandShape[i] != resultShape[i])
                 return emitOpError("operands in inputs2 must match the result shape on all non-concat dimensions");

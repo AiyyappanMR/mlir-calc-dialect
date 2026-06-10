@@ -121,9 +121,9 @@ def calc_catmuladdOp : calc_Op<"catmuladd", [Pure, SameOperandsAndResultElementT
     If `scale` is provided, it is added element-wise to `mul_out` to produce
     the final result. If `scale` is absent, `mul_out` is returned directly.
 
-    Both variadic groups must have the same number of operands
-    (enforced by `SameVariadicOperandSize`), and their concatenated shapes
-    must be identical.
+    The two variadic groups may have different numbers of operands, but the
+    concatenated shapes of `inputs1` and `inputs2` must be identical since the
+    results are multiplied element-wise.
     }];
     let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs1, Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs2, Optional<RankedTensorOf<[AnyInteger, AnyFloat]>>:$scale, OptionalAttr<SI32Attr>:$dim);
     let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);

@@ -192,3 +192,16 @@ func.func @catmuladd_3d_4p4inp_i64_dim2_bcastscale(%a: tensor<2x3x2xi64>, %b: te
     %0 = calc.catmuladd (%a, %b, %c, %d, %e, %f, %g, %h, %s) {operandSegmentSizes = array<i32: 4, 4, 1>, dim = 2 : si32} : (tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2xi64>, tensor<1x1x8xi64>) -> tensor<2x3x8xi64>
     return %0 : tensor<2x3x8xi64>
 }
+
+// Test 15: 2D f32, 3+2 inputs, dim=0, no scale (unequal groups)
+// CHECK-LABEL: func.func @catmuladd_2d_3p2inp_f32_dim0_noscale_unequal
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2x4xf32>, [[ARG1:%.+]]: tensor<2x4xf32>, [[ARG2:%.+]]: tensor<2x4xf32>, [[ARG3:%.+]]: tensor<3x4xf32>, [[ARG4:%.+]]: tensor<3x4xf32>) -> tensor<6x4xf32>
+func.func @catmuladd_2d_3p2inp_f32_dim0_noscale_unequal(%a: tensor<2x4xf32>, %b: tensor<2x4xf32>, %c: tensor<2x4xf32>, %d: tensor<3x4xf32>, %e: tensor<3x4xf32>) -> tensor<6x4xf32> {
+    // CHECK-DAG: [[CAT1:%.+]] = tosa.concat [[ARG0]], [[ARG1]], [[ARG2]] {axis = 0 : i32} : (tensor<2x4xf32>, tensor<2x4xf32>, tensor<2x4xf32>) -> tensor<6x4xf32>
+    // CHECK-DAG: [[CAT2:%.+]] = tosa.concat [[ARG3]], [[ARG4]] {axis = 0 : i32} : (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<6x4xf32>
+    // CHECK-DAG: [[SHIFT:%.+]] = "tosa.const"()
+    // CHECK-DAG: [[MUL:%.+]] = tosa.mul [[CAT1]], [[CAT2]], [[SHIFT]] : (tensor<6x4xf32>, tensor<6x4xf32>, tensor<1xi8>) -> tensor<6x4xf32>
+    // CHECK-NEXT: return [[MUL]]
+    %0 = calc.catmuladd (%a, %b, %c, %d, %e) {operandSegmentSizes = array<i32: 3, 2, 0>, dim = 0 : si32} : (tensor<2x4xf32>, tensor<2x4xf32>, tensor<2x4xf32>, tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<6x4xf32>
+    return %0 : tensor<6x4xf32>
+}

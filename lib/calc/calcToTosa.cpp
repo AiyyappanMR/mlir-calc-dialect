@@ -462,7 +462,7 @@ class convertCatMulAddOp : public mlir::OpRewritePattern<calc::catmuladdOp> {
     // Get location
     mlir::Location loc = op.getLoc();
 
-    // Initiaize a dim value to 0 and if the dim attribute is present, update the dim value accordingly.
+    // Initialize a dim value to 0 and if the dim attribute is present, update the dim value accordingly.
     int64_t dimVal = 0;
     mlir::Attribute dimAttr = op.getDimAttr();
     if (dimAttr) {

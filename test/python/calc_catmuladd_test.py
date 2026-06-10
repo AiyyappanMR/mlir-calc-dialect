@@ -147,8 +147,8 @@ def run_catmuladd(inputs1, inputs2, inputs1_types, inputs2_types, result_type, s
 #---------------------------------------------------------------------------------
 
 
-# parametrized test cases which map directly to the 14 tests in test/calc/catmuladd.mlir
-# each entry: (inputs1, inputs2, inputs1_types, inputs2_types, result_type, scale, scale_type, dim)
+ # parametrized test cases (15 total). Tests 1-14 map to test/calc/catmuladd.mlir; test 15 covers unequal operand counts.
+  # each entry: (inputs1, inputs2, inputs1_types, inputs2_types, result_type, scale, scale_type, dim)
 CATMULADD_TEST_CASES = [
 
     # Test 1: 1D f32, 1+1 inputs, dim=0, no scale
