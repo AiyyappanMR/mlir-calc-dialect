@@ -4,6 +4,8 @@ add_mlir_dialect_library(MLIRCalc
     calcOps.cpp
     calcToArith.cpp
     calcToTosa.cpp
+    calcBufferize.cpp
+    calcToMemRef.cpp
 
     ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/calc
@@ -16,6 +18,7 @@ add_mlir_dialect_library(MLIRCalc
     LINK_LIBS PUBLIC
     MLIRIR
     MLIRFuncDialect
+    MLIRMemRefDialect
     MLIRArithDialect
     MLIRTosaDialect
     MLIRTransforms
