@@ -215,6 +215,105 @@ mlir::LogicalResult calc::splitOp::verify() {
         }
     }
 
+mlir::LogicalResult calc::catmuladdOp::verify() {
+
+    // Get operand groups and result type
+    mlir::OperandRange inputs1 = getInputs1();
+    mlir::OperandRange inputs2 = getInputs2();
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult().getType());
+    int64_t resultRank = resultType.getRank();
+    
+    // Check: result must have rank >= 1 since we are concatenating along a dimension. If result is rank 0, it cannot have any dimensions to concatenate along.
+    if (resultRank == 0)
+        return emitOpError("requires rank >= 1 (cannot concatenate rank-0 tensors)");
+    
+        std::vector<int64_t> resultShape = resultType.getShape().vec(); // get result shape as vector
+
+    // Check 0: each group must have at least one operand.
+    if (inputs1.empty() || inputs2.empty())
+        return emitOpError("requires at least one operand in each variadic group");
+
+    // Check 1: dim range check
+    int64_t dimVal = 0;
+    mlir::Attribute dimAttr = getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+        if (dimVal < -resultRank || dimVal >= resultRank)
+            return emitOpError("dim must be in range [-rank, rank-1]");
+    }
+
+    // Handle negative dim value by converting it to the corresponding positive value.
+    if (dimVal < 0) dimVal += resultRank;
+
+    // Check 2: all operands in inputs1 must have the same rank as the result and match the result shape on 
+    // all non-concat dimensions
+
+    // Initialize a variable to keep track of the total size along the concat dimension for inputs1
+    int64_t input1DimSize = 0;
+    for (mlir::Value operand : inputs1) {
+        mlir::RankedTensorType operandType = llvm::cast<mlir::RankedTensorType>(operand.getType());
+        std::vector<int64_t> operandShape = operandType.getShape().vec();
+        // Check if the operand has the same rank as the result
+        if ((int64_t)operandShape.size() != resultRank)
+            return emitOpError("all operands in inputs1 must have the same rank as the result");
+        for (int64_t i = 0; i < (int64_t)operandShape.size(); i++) {
+            // For the concat dimension, we accumulate the size to compare with the result shape later.
+            if (i == dimVal) {
+                if (operandType.isDynamicDim(dimVal))
+                    return emitOpError("requires static operand sizes along the concat dimension");
+                input1DimSize += operandShape[i];
+            }
+            // For non-concat dimensions, the operand shape must match the result shape.
+            else if (operandShape[i] != resultShape[i])
+                return emitOpError("operands in inputs1 must match the result shape on all non-concat dimensions");
+        }
+    }
+
+    // Check 3: all operands in inputs2 must have the same rank as the result and match the result shape on 
+    // all non-concat dimensions
+
+    // Initialize a variable to keep track of the total size along the concat dimension for inputs2
+    int64_t input2DimSize = 0;
+    for (mlir::Value operand : inputs2) {
+        mlir::RankedTensorType operandType = llvm::cast<mlir::RankedTensorType>(operand.getType());
+        std::vector<int64_t> operandShape = operandType.getShape().vec();
+        // Check if the operand has the same rank as the result
+        if ((int64_t)operandShape.size() != resultRank)
+            return emitOpError("all operands in inputs2 must have the same rank as the result");
+        for (int64_t i = 0; i < (int64_t)operandShape.size(); i++) {
+            // For the concat dimension, we accumulate the size to compare with the result shape later.
+            if (i == dimVal) {
+                if (operandType.isDynamicDim(dimVal))
+                    return emitOpError("requires static operand sizes along the concat dimension");
+                input2DimSize += operandShape[i];
+            }
+            // For non-concat dimensions, the operand shape must match the result shape.
+            else if (operandShape[i] != resultShape[i])
+                return emitOpError("operands in inputs2 must match the result shape on all non-concat dimensions");
+        }
+    }
+
+    // Check 4: inputs1 and inputs2 must produce the same concat-dim size since cat_a and cat_b are 
+    // multiplied element-wise. Result shape along dim must equal that common size.
+    if (input1DimSize != input2DimSize)
+        return emitOpError("inputs1 and inputs2 must have the same total size along the concat dimension");
+    if (input1DimSize != resultShape[dimVal])
+        return emitOpError("the concat-dim size of each group must equal the result size along that dimension");
+
+    // Check 5: optional scale operand must be broadcastable to the result shape
+    mlir::Value scale = getScale();
+    if (scale) {
+        mlir::RankedTensorType scaleType = llvm::cast<mlir::RankedTensorType>(scale.getType());
+        std::vector<int64_t> scaleShape = scaleType.getShape().vec();
+        // Scale must have the same rank as the result and each dimension must be either 1 or match the 
+        // corresponding dimension of the result.
+        if ((int64_t)scaleShape.size() != resultRank)
+            return emitOpError("scale operand must have the same rank as the result");
+        for (int64_t i = 0; i < (int64_t)scaleShape.size(); i++) {
+            if (scaleShape[i] != 1 && scaleShape[i] != resultShape[i])
+                return emitOpError("scale operand must be broadcastable to the result shape");
+        }
+    }
 
     return mlir::success();
 }
@@ -232,6 +331,52 @@ mlir::LogicalResult calc::softmaxOp::verify() {
      if (dimVal < -rank || dimVal >= rank){
             return emitOpError("dim must be in range [-rank, rank-1]");
     }
+    return mlir::success();
+}
+
+mlir::LogicalResult calc::stackOp::verify() {
+
+    // Get input rank and dim attribute value
+    mlir::OperandRange inputs = getInputs();
+    if (inputs.empty()){
+        return emitOpError("requires at least one input tensor");
+    }
+    mlir::RankedTensorType firstType = llvm::cast<mlir::RankedTensorType>(inputs[0].getType());
+    int64_t rank = firstType.getRank();
+    int64_t numInputs = inputs.size();
+
+    int64_t dimVal = 0; // default dim value is 0
+
+    // Check 1: dim range check
+    mlir::Attribute dimAttr = getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+        if (dimVal < -(rank + 1) || dimVal > rank){
+            return emitOpError("dim must be in range [-(rank+1), rank]");
+        }
+    }
+
+    // Check 2: all input tensors should have the same shape and type
+    for (mlir::Value input : inputs) {
+        mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(input.getType());
+        if (inputType.getShape() != firstType.getShape() || inputType.getElementType() != firstType.getElementType()) {
+            return emitOpError("all input tensors must have the same shape and type");
+        }
+    }
+
+    if (dimVal < 0) dimVal += rank + 1;
+
+    // Check 3: result shape verification based on input shapes and dim attribute.
+    std::vector<int64_t> expectedShape = firstType.getShape().vec();
+    expectedShape.insert(expectedShape.begin() + dimVal, numInputs);
+
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult().getType());
+    std::vector<int64_t> resultShape = resultType.getShape().vec();
+
+    if (resultShape != expectedShape) {
+        return emitOpError("result shape is not consistent with input shapes and dim attribute");
+    }
+
     return mlir::success();
 }
 

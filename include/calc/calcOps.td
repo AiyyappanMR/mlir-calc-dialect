@@ -135,6 +135,25 @@ def calc_splitOp : calc_Op<"split", [Pure, SameOperandsAndResultElementType]> {
     let results = (outs Variadic<RankedTensorOf<[I32, I64, F32, F64]>>:$results);
     let hasVerifier = 1;
     let assemblyFormat = "$input attr-dict `:` functional-type($input, $results)";
+def calc_catmuladdOp : calc_Op<"catmuladd", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, AttrSizedOperandSegments]>{
+    let summary = "Concatenates two variadic tensor groups separately, multiplies the results element-wise, and optionally adds a scale tensor to the product";
+    let description = [{
+    Concatenates the `inputs1` tensors along `dim` to produce `cat_a`, and
+    concatenates the `inputs2` tensors along `dim` to produce `cat_b`.
+    The two results are multiplied element-wise to produce `mul_out`.
+    If `scale` is provided, it is added element-wise to `mul_out` to produce
+    the final result. If `scale` is absent, `mul_out` is returned directly.
+
+    The two variadic groups may have different numbers of operands, but the
+    concatenated shapes of `inputs1` and `inputs2` must be identical since the
+    results are multiplied element-wise.
+    }];
+    let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs1, Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs2, Optional<RankedTensorOf<[AnyInteger, AnyFloat]>>:$scale, OptionalAttr<SI32Attr>:$dim);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = [{
+    `(` operands `)` attr-dict `:` functional-type(operands, results)
+    }];
 }
 
 def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
@@ -169,6 +188,22 @@ def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultType]> {
     }];
     let arguments = (ins RankedTensorOf<[F32, F64]>:$input, SI32Attr:$dim);
     let results = (outs RankedTensorOf<[F32, F64]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
+}
+
+def calc_stackOp : calc_Op<"stack", [Pure, SameOperandsAndResultElementType]> {
+    let summary = "Stacks a list of tensors along a new dimension";
+    let description = [{
+    Stacks a list of tensors along a new dimension specified by `dim` (i32).
+
+    All input tensors must have the same shape and element type.
+    The output tensor will have one more dimension than the input tensors, with size equal to the number of input tensors along the `dim` axis.
+
+    Negative `dim` indexing is supported. Dim must be present and valid.
+    }];
+    let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs, OptionalAttr<SI32Attr>:$dim);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
     let hasVerifier = 1;
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
 }

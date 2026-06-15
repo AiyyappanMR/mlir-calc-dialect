@@ -517,6 +517,77 @@ class convertProdOp : public mlir::OpRewritePattern<calc::prodOp> {
 };
 } // namespace
 
+namespace { 
+class convertCatMulAddOp : public mlir::OpRewritePattern<calc::catmuladdOp> {
+  using mlir::OpRewritePattern<calc::catmuladdOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(calc::catmuladdOp op, mlir::PatternRewriter &rewriter) const override {
+
+    // Get location
+    mlir::Location loc = op.getLoc();
+
+    // Initialize a dim value to 0 and if the dim attribute is present, update the dim value accordingly.
+    int64_t dimVal = 0;
+    mlir::Attribute dimAttr = op.getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+    }
+
+    // Get the result type
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult().getType());
+    int64_t rank = resultType.getRank();
+
+    // Normalize negative dim value
+    if (dimVal < 0) dimVal += rank;
+
+    // defensive bounds check
+    if (dimVal < 0 || dimVal >= rank)
+        return rewriter.notifyMatchFailure(op, "dim out of range");
+
+    mlir::OperandRange inputs1 = op.getInputs1();
+    mlir::OperandRange inputs2 = op.getInputs2();
+
+    std::vector<mlir::Value> Inputs1;
+    std::vector<mlir::Value> Inputs2;
+
+    for (mlir::Value v : inputs1) {
+        Inputs1.push_back(v);
+    }
+
+    for (mlir::Value v : inputs2) {
+        Inputs2.push_back(v);
+    }
+
+    mlir::Value cat1 = mlir::tosa::ConcatOp::create(rewriter, loc, resultType, Inputs1, rewriter.getI32IntegerAttr(dimVal));
+    mlir::Value cat2 = mlir::tosa::ConcatOp::create(rewriter, loc, resultType, Inputs2, rewriter.getI32IntegerAttr(dimVal));
+
+    // Create a constant shift value of 0 for the tosa::MulOp
+    mlir::RankedTensorType shiftType =
+    mlir::RankedTensorType::get({1}, rewriter.getI8Type()); // {1} not {}
+    mlir::DenseElementsAttr shiftAttr =
+    mlir::DenseElementsAttr::get(shiftType, rewriter.getI8IntegerAttr(0));
+    mlir::Value shift =
+    mlir::tosa::ConstOp::create(rewriter, op.getLoc(), shiftType, shiftAttr);
+
+    // Performs the element-wise multiplication of cat1 by cat2.
+    mlir::Value catmuladdResult = mlir::tosa::MulOp::create(rewriter, loc, resultType, cat1, cat2, shift);
+
+    mlir::Value scale = op.getScale();
+    if (scale) {
+        mlir::Value scaledResult = mlir::tosa::AddOp::create(rewriter, loc, resultType, catmuladdResult, scale);
+        rewriter.replaceOp(op, scaledResult);
+        return mlir::success();
+    }
+
+    // Replace the original catmuladd op with the final result.
+    rewriter.replaceOp(op, catmuladdResult);
+    return mlir::success();
+  }
+};
+} // namespace
+
+
 
 namespace { 
 class convertSoftmaxOp : public mlir::OpRewritePattern<calc::softmaxOp> {
@@ -571,6 +642,71 @@ class convertSoftmaxOp : public mlir::OpRewritePattern<calc::softmaxOp> {
 };
 } // namespace
 
+namespace { 
+class convertStackOp : public mlir::OpRewritePattern<calc::stackOp> {
+  using mlir::OpRewritePattern<calc::stackOp>::OpRewritePattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(calc::stackOp op, mlir::PatternRewriter &rewriter) const override {
+
+    // Get location
+    mlir::Location loc = op.getLoc();
+
+    // Initiaize a dim value to 0 and if the dim attribute is present, update the dim value accordingly.
+    int64_t dimVal = 0;
+    mlir::Attribute dimAttr = op.getDimAttr();
+    if (dimAttr) {
+        dimVal = llvm::cast<mlir::IntegerAttr>(dimAttr).getValue().getSExtValue();
+    }
+
+    // Get the input operands and their types.
+    mlir::OperandRange inputs = op.getInputs();
+    mlir::RankedTensorType inputType = llvm::cast<mlir::RankedTensorType>(inputs[0].getType());
+    std::vector<int64_t> inputShape = inputType.getShape().vec();
+
+    // Get the result type and rank
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult().getType()); 
+    int64_t resultRank = resultType.getRank();
+
+
+    // normalize negative dim first
+    if (dimVal < 0) dimVal += inputType.getRank()+1;
+
+    // defensive bounds check
+    if (dimVal < 0 || dimVal > inputType.getRank())
+        return rewriter.notifyMatchFailure(op, "dim out of range");
+
+    inputShape.insert(inputShape.begin() + dimVal, 1);
+
+    // Pad the input tensor shapes with 1s at the dim axis so that they can be concatenated together. 
+    // eg: if we have 3 input tensors of shape [2, 3] and dim=1, we will reshape them to [2, 1, 3] 
+    //     and then concatenate along dim=1 to get a final result of shape [2, 3, 3].
+
+    mlir::RankedTensorType reshapeType = mlir::RankedTensorType::get(inputShape, inputType.getElementType());
+    mlir::tosa::shapeType reshapeTy = mlir::tosa::shapeType::get(rewriter.getContext(), resultRank);
+    auto reshapeAttr = rewriter.getIndexTensorAttr(inputShape);
+    mlir::Value shapeConst = mlir::tosa::ConstShapeOp::create(rewriter, loc, reshapeTy, reshapeAttr);
+
+    // Initialize a vector to hold the reshaped input tensors.
+    std::vector<mlir::Value> reshapedInputs;
+    for (mlir::Value input : op.getInputs()) {
+
+        // reshape each input tensor to the new shape with 1 at the dim axis using tosa::ReshapeOp.
+        mlir::Value reshapedInput = mlir::tosa::ReshapeOp::create(rewriter, loc, reshapeType, input, shapeConst);
+        reshapedInputs.push_back(reshapedInput);
+    }
+
+    // Concatenate the reshaped input tensors along the specified dim using tosa::ConcatOp to get the final result.
+    mlir::Value stackResult = mlir::tosa::ConcatOp::create(rewriter, loc, resultType, reshapedInputs, rewriter.getI32IntegerAttr(dimVal));
+
+    
+    // Replace the original stack op with the final result.
+    rewriter.replaceOp(op, stackResult);
+    return mlir::success();
+  }
+};
+} // namespace
+
 namespace calc {
 class CalcToTosaPass : public impl::CalcToTosaPassBase<CalcToTosaPass> {
 public:
@@ -619,9 +755,17 @@ public:
     target.addIllegalOp<prodOp>();
     patterns.add<convertProdOp>(&getContext());
 
+    // Adding catmuladdOp to the illegal ops.
+    target.addIllegalOp<catmuladdOp>();
+    patterns.add<convertCatMulAddOp>(&getContext());
+
     // Adding softmaxOp to the illegal ops.
     target.addIllegalOp<softmaxOp>();
     patterns.add<convertSoftmaxOp>(&getContext());
+
+    // Adding stackOp to the illegal ops.
+    target.addIllegalOp<stackOp>();
+    patterns.add<convertStackOp>(&getContext());
 
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns))))
