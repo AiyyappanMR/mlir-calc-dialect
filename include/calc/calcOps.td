@@ -112,6 +112,27 @@ def calc_entrOp : calc_Op<"entr", [Pure]> {
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
 }
 
+def calc_catmuladdOp : calc_Op<"catmuladd", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, AttrSizedOperandSegments]>{
+    let summary = "Concatenates two variadic tensor groups separately, multiplies the results element-wise, and optionally adds a scale tensor to the product";
+    let description = [{
+    Concatenates the `inputs1` tensors along `dim` to produce `cat_a`, and
+    concatenates the `inputs2` tensors along `dim` to produce `cat_b`.
+    The two results are multiplied element-wise to produce `mul_out`.
+    If `scale` is provided, it is added element-wise to `mul_out` to produce
+    the final result. If `scale` is absent, `mul_out` is returned directly.
+
+    The two variadic groups may have different numbers of operands, but the
+    concatenated shapes of `inputs1` and `inputs2` must be identical since the
+    results are multiplied element-wise.
+    }];
+    let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs1, Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs2, Optional<RankedTensorOf<[AnyInteger, AnyFloat]>>:$scale, OptionalAttr<SI32Attr>:$dim);
+    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let hasVerifier = 1;
+    let assemblyFormat = [{
+    `(` operands `)` attr-dict `:` functional-type(operands, results)
+    }];
+}
+
 def calc_prodOp : calc_Op<"prod",[Pure, SameOperandsAndResultElementType]>{
     let summary = "Computes the product of all elements in the input tensor";
     let description = [{
