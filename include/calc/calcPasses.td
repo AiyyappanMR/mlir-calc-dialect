@@ -20,4 +20,12 @@ def CalcBroadcastPass : Pass<"calc-broadcast", "::mlir::ModuleOp"> {
         operations have matching ranks before lowering to TOSA.
     }];
 }
+def CalcVerifyTosaBackendContractPass : Pass<"calc-verify-tosa-backend-contract", "::mlir::ModuleOp"> {
+    let summary = "Verifies that all calc ops have been lowered to TOSA.";
+    let description = [{
+        This pass verifies that the IR conforms to the TOSA backend contract. 
+        Specifically, it ensures that no operations from the `calc` dialect remain 
+        in the IR, meaning they have all been successfully lowered to TOSA, Arith, or standard MLIR ops.
+    }];
+}
 #endif 

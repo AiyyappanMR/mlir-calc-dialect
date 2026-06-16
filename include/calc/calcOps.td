@@ -135,6 +135,8 @@ def calc_splitOp : calc_Op<"split", [Pure, SameOperandsAndResultElementType]> {
     let results = (outs Variadic<RankedTensorOf<[I32, I64, F32, F64]>>:$results);
     let hasVerifier = 1;
     let assemblyFormat = "$input attr-dict `:` functional-type($input, $results)";
+}
+
 def calc_catmuladdOp : calc_Op<"catmuladd", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, AttrSizedOperandSegments]>{
     let summary = "Concatenates two variadic tensor groups separately, multiplies the results element-wise, and optionally adds a scale tensor to the product";
     let description = [{
