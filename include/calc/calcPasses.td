@@ -20,4 +20,21 @@ def CalcBroadcastPass : Pass<"calc-broadcast", "::mlir::ModuleOp"> {
         operations have matching ranks before lowering to TOSA.
     }];
 }
+
+def CalcBufferizePass : Pass<"calc-bufferize", "::mlir::ModuleOp"> {
+    let summary = "Bufferize calc operations";
+    let description = [{
+        Bufferizes calc operations to prepare for lowering to TOSA.
+        This involves converting tensor types to memref types and inserting
+        necessary load/store operations.
+    }];
+}
+
+def CalcToMemRefPass : Pass<"calc-to-memref", "::mlir::ModuleOp"> {
+  let summary = "Lower bufferized calc ops to memref ops";
+  let description = [{
+    Lowers bufferized calc ops (memref operands)
+  }];
+}
+
 #endif 
