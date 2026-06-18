@@ -31,7 +31,7 @@ class convertCopyOp : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
 
         // Verify that the source and target memref has matching ranks
         if (SourceTy.getRank() != TargetTy.getRank()){
-            return rewriter.notifyMatchFailure(op, "Source and Target rank doesnt match");
+            return rewriter.notifyMatchFailure(op, "Source and Target rank doesn't match");
         }
 
         // Create Affine Maps for source and target
@@ -42,7 +42,7 @@ class convertCopyOp : public mlir::OpRewritePattern<mlir::memref::CopyOp> {
         llvm::SmallVector<mlir::utils::IteratorType> iteratorTypes(SourceTy.getRank(), mlir::utils::IteratorType::parallel);
 
         // creates linalg generic Op
-        auto linalg = mlir::linalg::GenericOp::create(rewriter, loc, mlir::TypeRange{}, source, target, indexingMaps, iteratorTypes,
+        mlir::linalg::GenericOp::create(rewriter, loc, mlir::TypeRange{}, source, target, indexingMaps, iteratorTypes,
             [](mlir::OpBuilder &b, mlir::Location loc, mlir::ValueRange args) {
                 mlir::linalg::YieldOp::create(b, loc, args[0]);
             });
@@ -66,7 +66,7 @@ public:
         mlir::RewritePatternSet patterns(&getContext());
         
         // Adding legal dialect
-        target.addLegalDialect<mlir::func::FuncDialect, mlir::linalg::LinalgDialect>();
+        target.addLegalDialect<mlir::func::FuncDialect, mlir::linalg::LinalgDialect, mlir::memref::MemRefDialect>();
         // Adding memref.Copy Op as Illegal Op
         target.addIllegalOp<mlir::memref::CopyOp>();
 

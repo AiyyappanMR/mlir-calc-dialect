@@ -2,6 +2,7 @@
 # conversion pass, which rewrites memref.copy ops into linalg.generic ops with
 # identity indexing maps and parallel iterator types.
 
+import os
 import sys
 import ctypes
 import pytest
@@ -28,8 +29,9 @@ def MemRefToLinalgToLLVM(module):
     pm = PassManager.parse(
         "builtin.module("
             "memref-to-linalg,"
-            "convert-linalg-to-loops,"
-            "convert-scf-to-cf,"
+            "func.func(convert-linalg-to-loops),"
+            "func.func(convert-scf-to-cf),"
+            "expand-strided-metadata,"
             "finalize-memref-to-llvm,"
             "convert-arith-to-llvm,"
             "convert-cf-to-llvm,"
