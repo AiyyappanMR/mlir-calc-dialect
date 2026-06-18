@@ -1,5 +1,7 @@
-// RUN: ./bin/calc-opt --pass-pipeline="builtin.module(calc-to-arith, calc-verify-tosa-backend-contract)" ../test/calc/verifyTosaBackendContract.mlir
-//
+ // RUN: not calc-opt --pass-pipeline="builtin.module(calc-to-arith, calc-verify-tosa-backend-contract)" %s 2>&1 | FileCheck %s
+ // CHECK: error: Module does not conform to the TOSA backend contract.
+ // CHECK-SAME: Found illegal 'calc' operation
+ 
 // NOTE: This test intentionally triggers a pass failure.
 // calc.mul has an arith lowering and will be converted successfully.
 // calc.print has NO lowering — it survives calc-to-arith as-is,

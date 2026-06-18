@@ -1,4 +1,5 @@
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 #include "calc/calcDialect.h"
@@ -35,7 +36,7 @@ class CalcVerifyTosaBackendContractPass
     if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns)))) {
       // We avoid `module.emitError()` so that mlir-print-op-on-diagnostics
       // doesn't unnecessarily spew out the entire module.
-      emitError(module.getLoc())
+      mlir::emitError(module.getLoc())
           << "Module does not conform to the TOSA backend contract. "
              "Found illegal 'calc' operation after lowering to TOSA.";
       return signalPassFailure();
