@@ -1,3 +1,5 @@
+// Tests lowering of calc.split to tosa dialect.
+
 // RUN: calc-opt %s --calc-to-tosa | FileCheck %s
 
 // 1D inputs

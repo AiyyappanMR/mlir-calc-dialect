@@ -1,4 +1,6 @@
-// RUN: ./bin/calc-opt ../test/tensor.mlir 
+// Tests lowering of tosa dialect to linalg dialect.
+
+// RUN: ./bin/calc-opt ../test/tensor.mlir
 // RUN(lower to linalg): ./bin/calc-opt ../test/tensor.mlir --pass-pipeline="builtin.module(func.func(tosa-to-linalg))" 
 
 func.func @test_add(%arg0: tensor<4xi32>, %arg1: tensor<?xi32>) -> tensor<?xi32> {

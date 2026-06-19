@@ -1,3 +1,5 @@
+// Tests bufferization of the calc dialect (calc.stack).
+
 // RUN: calc-opt --calc-bufferize --calc-to-memref %s | FileCheck %s
 
 // Test 1: Standard 1D Tensor Stack along Dim 0

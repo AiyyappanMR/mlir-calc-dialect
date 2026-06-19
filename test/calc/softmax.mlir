@@ -1,3 +1,5 @@
+// Tests lowering of calc.softmax to tosa dialect.
+
 // RUN: calc-opt %s --calc-to-tosa | FileCheck %s
 
 // Test 1: 2D f32 dim=0

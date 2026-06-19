@@ -1,3 +1,5 @@
+// Tests lowering of affine dialect to llvm.
+
 // RUN: ./bin/calc-opt ../test/affine.mlir
 // RUN(lower affine -> arith,scf -> arith,cf): 
 // /bin/calc-opt ../test/affine.mlir   --pass-pipeline="builtin.module(func.func(

@@ -1,3 +1,5 @@
+// Tests lowering of calc dialect basic operations to tosa dialect.
+
 // RUN: calc-opt --calc-to-tosa %s | FileCheck %s
 
 // CHECK-LABEL: func.func @test_add_0

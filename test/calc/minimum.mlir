@@ -1,3 +1,5 @@
+// Tests lowering of calc.minimum to tosa dialect.
+
 // RUN: calc-opt --calc-to-tosa %s | FileCheck %s
 
 // Test 1: 1D f32
