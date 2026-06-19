@@ -665,7 +665,7 @@ class convertStackOp : public mlir::OpRewritePattern<calc::stackOp> {
     std::vector<int64_t> inputShape = inputType.getShape().vec();
 
     // Get the result type and rank
-    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult().getType()); 
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(op.getResult()[0].getType());
     int64_t resultRank = resultType.getRank();
 
 
