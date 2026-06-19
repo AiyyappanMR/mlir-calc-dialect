@@ -1,3 +1,5 @@
+// Tests lowering of calc dialect operations to arith dialect.
+
 // RUN: calc-opt --calc-to-arith %s | FileCheck %s
 
 // CHECK-LABEL: func.func @test_add_0

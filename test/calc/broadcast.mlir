@@ -1,3 +1,5 @@
+// Tests broadcasting for calc dialect operations using calc-broadcast pass.
+
 // RUN: calc-opt --calc-broadcast %s | FileCheck %s
 
 // Test 1: 1D vs 2D — lower rank gets reshaped, then tiled to match shape

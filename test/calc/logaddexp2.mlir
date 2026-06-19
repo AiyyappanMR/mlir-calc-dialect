@@ -1,3 +1,5 @@
+// Tests lowering of calc.logaddexp2 to tosa dialect.
+
 // RUN: calc-opt --calc-to-tosa %s | FileCheck %s
 
 // CHECK-LABEL: func.func @test_logaddexp2_0d

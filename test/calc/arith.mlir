@@ -1,3 +1,5 @@
+// Tests lowering of arith dialect to llvm.
+
 // RUN: ./bin/calc-opt ../test/arith.mlir
 // RUN(lowering to llvm): ./bin/calc-opt ../test/arith.mlir --pass-pipeline="builtin.module(func.func(convert-arith-to-llvm))"
 
