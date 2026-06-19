@@ -13,6 +13,8 @@ While the `include/` directory provides the declarations, interfaces, and TableG
   * `calcToArith.cpp`: Implements the lowering patterns from `calc` ops to the `arith` dialect (`--calc-to-arith`).
   * `calcToTosa.cpp`: Implements the lowering patterns from `calc` ops to the `tosa` dialect (`--calc-to-tosa`).
   * `verifyTosaBackendContract.cpp`: Implements the strict verification pass (`--calc-verify-tosa-backend-contract`) that ensures no `calc` operations remain in the IR after lowering to the TOSA backend.
+  * `calcBufferize.cpp`: Implements the `--calc-bufferize` pass to bufferize tensor-based calc operations.
+  * `calcToMemRef.cpp`: Implements the `--calc-to-memref` pass to lower bufferized calc ops to memref operations.
 
 * **`CAPI/`**: Contains the implementations for the C API bindings declared in `include/calc-c/`. 
   * `Dialects.cpp`: Implements the C API for dialect interaction.

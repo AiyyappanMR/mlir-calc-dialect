@@ -19,3 +19,4 @@ These files test specific cross-operation passes or broader lowering pipelines.
   * `broadcast.mlir`: Tests the `--calc-broadcast` pass, ensuring explicit reshape or broadcast operations are correctly inserted for mismatched operand shapes.
   * `canonicalizer_test.mlir`: Tests constant folding and algebraic simplification patterns.
   * `verifyTosaBackendContract.mlir`: Validates the strict verification pass (`--calc-verify-tosa-backend-contract`) ensuring it correctly errors out if unlowered `calc` ops are found.
+  * `calcbufferize.mlir`: Tests the `--calc-bufferize` and `--calc-to-memref` passes, validating bufferization and memref lowering.

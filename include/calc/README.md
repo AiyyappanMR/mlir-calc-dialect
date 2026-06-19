@@ -34,12 +34,12 @@ When developing tools or linking against the `calc` dialect in C++, you will typ
 | Operation | Description |
 |---|---|
 | `calc.const` | To get literal value |
-| `calc.add` | Add two scaler values |
+| `calc.add` | Add two scalar values |
 | `calc.addt` | Add two tensor values |
 | `calc.mult` | Multiply two tensor values |
 | `calc.addcmul` | Add scaled element-wise multiplication of two tensors to input |
 | `calc.logaddexp2` | Add two tensors in log space with base 2 |
-| `calc.minimum` | performs element-wise minimum of two tensors |
+| `calc.minimum` | Performs element-wise minimum of two tensors |
 | `calc.entr` | Computes the element-wise entropy of a tensor |
 | `calc.split` | Splits a tensor into chunks of specified sizes along a dimension |
 | `calc.catmuladd` | Concatenates two variadic tensor groups separately, multiplies the results element-wise, and optionally adds a scale tensor to the product |
@@ -57,6 +57,8 @@ When developing tools or linking against the `calc` dialect in C++, you will typ
 | `--calc-to-tosa` | Lower calc dialect to tosa dialect |
 | `--calc-broadcast` | Broadcast calc operations to have matching shapes |
 | `--calc-verify-tosa-backend-contract` | Verifies that all calc ops have been lowered to TOSA. |
+| `--calc-bufferize` | Bufferize calc operations |
+| `--calc-to-memref` | Lower bufferized calc ops to memref ops |
 
 *Note: The actual source code implementing the logic declared in these headers is located in the project's root `lib/` directory.*
 
