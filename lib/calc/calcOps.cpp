@@ -214,6 +214,8 @@ mlir::LogicalResult calc::splitOp::verify() {
             }
         }
     }
+    return mlir::success();
+}
 
 mlir::LogicalResult calc::catmuladdOp::verify() {
 

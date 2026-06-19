@@ -4,6 +4,7 @@ add_mlir_dialect_library(MLIRCalc
     calcOps.cpp
     calcToArith.cpp
     calcToTosa.cpp
+    verifyTosaBackendContract.cpp
     calcBufferize.cpp
     calcToMemRef.cpp
 
