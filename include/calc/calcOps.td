@@ -24,7 +24,7 @@ def calc_constOp : calc_Op<"const", [Pure]> {
     //let assemblyFormat = "attr-dict $value";
 }
 
-def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType, OperandsMustbeFloat]> {
+def calc_addOp : calc_Op<"add", [Pure, Commutative, SameOperandsAndResultType]> {
     let summary = "Add two scaler values";
     let description = [{
         Adds two scalar integer or float values of the same type.
@@ -225,6 +225,20 @@ def calc_printOp : calc_Op<"print", []> {
     let description = [{Takes one integer operand and prints it.}];
     let arguments = (ins AnyTypeOf<[I32, I64]>:$input1);
     let assemblyFormat = "$input1 `:` type($input1) attr-dict ";
+}
+
+def calc_testOp : calc_Op<"test", [Pure, OperandsMustbeFloat]>{
+    let summary = "Testing operation for the OperandsMustbeFloat trait verification";
+    let description = [{
+        An internal testing operation designed explicitly to validate the behavior
+        of the `OperandsMustbeFloat` trait constraint.
+    }];
+    let arguments = (ins 
+        AnyTypeOf<[AnyInteger, AnyFloat]>:$input1, 
+        AnyTypeOf<[AnyInteger, AnyFloat]>:$input2
+    );
+    let results = (outs AnyTypeOf<[AnyInteger, AnyFloat]>:$result);
+    let assemblyFormat = "$input1 `,` $input2 attr-dict `:` type($input1) `,` type($input2) `->` type($result)";
 }
 
 #endif
