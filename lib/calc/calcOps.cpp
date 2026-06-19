@@ -214,6 +214,8 @@ mlir::LogicalResult calc::splitOp::verify() {
             }
         }
     }
+    return mlir::success();
+}
 
 mlir::LogicalResult calc::catmuladdOp::verify() {
 
@@ -341,6 +343,11 @@ mlir::LogicalResult calc::stackOp::verify() {
     if (inputs.empty()){
         return emitOpError("requires at least one input tensor");
     }
+
+    // if memref (post-bufferization), skip tensor-specific checks
+    if (!mlir::isa<mlir::RankedTensorType>(inputs[0].getType()))
+        return mlir::success();
+
     mlir::RankedTensorType firstType = llvm::cast<mlir::RankedTensorType>(inputs[0].getType());
     int64_t rank = firstType.getRank();
     int64_t numInputs = inputs.size();
@@ -370,7 +377,11 @@ mlir::LogicalResult calc::stackOp::verify() {
     std::vector<int64_t> expectedShape = firstType.getShape().vec();
     expectedShape.insert(expectedShape.begin() + dimVal, numInputs);
 
-    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult().getType());
+    // result may be memref or absent (bufferized form)
+    if (getResult().empty() || !mlir::isa<mlir::RankedTensorType>(getResult()[0].getType()))
+        return mlir::success();
+
+    mlir::RankedTensorType resultType = llvm::cast<mlir::RankedTensorType>(getResult()[0].getType());
     std::vector<int64_t> resultShape = resultType.getShape().vec();
 
     if (resultShape != expectedShape) {

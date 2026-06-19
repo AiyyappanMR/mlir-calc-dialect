@@ -135,6 +135,8 @@ def calc_splitOp : calc_Op<"split", [Pure, SameOperandsAndResultElementType]> {
     let results = (outs Variadic<RankedTensorOf<[I32, I64, F32, F64]>>:$results);
     let hasVerifier = 1;
     let assemblyFormat = "$input attr-dict `:` functional-type($input, $results)";
+}
+
 def calc_catmuladdOp : calc_Op<"catmuladd", [Pure, SameOperandsAndResultElementType, SameOperandsAndResultRank, AttrSizedOperandSegments]>{
     let summary = "Concatenates two variadic tensor groups separately, multiplies the results element-wise, and optionally adds a scale tensor to the product";
     let description = [{
@@ -192,7 +194,7 @@ def calc_softmaxOp : calc_Op<"softmax", [Pure, SameOperandsAndResultType]> {
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
 }
 
-def calc_stackOp : calc_Op<"stack", [Pure, SameOperandsAndResultElementType]> {
+def calc_stackOp : calc_Op<"stack", [Pure]> {
     let summary = "Stacks a list of tensors along a new dimension";
     let description = [{
     Stacks a list of tensors along a new dimension specified by `dim` (i32).
@@ -202,8 +204,8 @@ def calc_stackOp : calc_Op<"stack", [Pure, SameOperandsAndResultElementType]> {
 
     Negative `dim` indexing is supported. Dim must be present and valid.
     }];
-    let arguments = (ins Variadic<RankedTensorOf<[AnyInteger, AnyFloat]>>:$inputs, OptionalAttr<SI32Attr>:$dim);
-    let results = (outs RankedTensorOf<[AnyInteger, AnyFloat]>:$result);
+    let arguments = (ins Variadic<AnyShaped>:$inputs, OptionalAttr<SI32Attr>:$dim);
+    let results = (outs Variadic<AnyShaped>:$result);
     let hasVerifier = 1;
     let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";  
 }
