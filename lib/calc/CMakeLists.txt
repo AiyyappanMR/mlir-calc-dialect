@@ -4,6 +4,7 @@ add_mlir_dialect_library(MLIRCalc
     calcOps.cpp
     calcToArith.cpp
     calcToTosa.cpp
+    memrefToLinalg.cpp
     verifyTosaBackendContract.cpp
     calcBufferize.cpp
     calcToMemRef.cpp
@@ -21,6 +22,8 @@ add_mlir_dialect_library(MLIRCalc
     MLIRFuncDialect
     MLIRMemRefDialect
     MLIRArithDialect
+    MLIRLinalgDialect
+    MLIRMemRefDialect
     MLIRTosaDialect
     MLIRTransforms
     MLIRPass

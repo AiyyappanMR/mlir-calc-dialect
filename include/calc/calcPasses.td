@@ -21,6 +21,17 @@ def CalcBroadcastPass : Pass<"calc-broadcast", "::mlir::ModuleOp"> {
     }];
 }
 
+def MemRefToLinalgPass : Pass<"memref-to-linalg", "::mlir::ModuleOp">{
+    let summary = "Lowers memref dialect to linalg dialect";
+    let description = [{
+        Converts memref operations to their linalg equivalents to enable
+        uniform lowering through the linalg pipeline.
+
+        The primary conversion is `memref.copy`, which is rewritten as a
+        `linalg.generic` op.
+    }];
+}
+
 def CalcVerifyTosaBackendContractPass : Pass<"calc-verify-tosa-backend-contract", "::mlir::ModuleOp"> {
     let summary = "Verifies that all calc ops have been lowered to TOSA.";
     let description = [{
